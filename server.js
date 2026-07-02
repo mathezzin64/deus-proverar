@@ -194,6 +194,12 @@ app.get('/api/summary', async (_req, res) => {
 
   res.json({
     totalSold: paidOrders.reduce((sum, order) => sum + Number(order.total || 0), 0),
+    byPaymentMethod: {
+      cash: paidOrders.filter(order => order.paymentMethod === 'cash').reduce((sum, order) => sum + Number(order.total || 0), 0),
+      pix: paidOrders.filter(order => order.paymentMethod === 'pix').reduce((sum, order) => sum + Number(order.total || 0), 0),
+      credit: paidOrders.filter(order => order.paymentMethod === 'credit').reduce((sum, order) => sum + Number(order.total || 0), 0),
+      debit: paidOrders.filter(order => order.paymentMethod === 'debit').reduce((sum, order) => sum + Number(order.total || 0), 0)
+    },
     ordersCount: data.orders.length,
     paidCount: paidOrders.length,
     pendingPaymentCount: data.orders.filter(order => order.paymentStatus !== 'paid').length,

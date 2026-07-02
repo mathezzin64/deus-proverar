@@ -301,9 +301,11 @@ function orderTemplate(order) {
       ${adminDetails}
 
       <div class="order-statuses">
-        <span class="tag ${order.paymentStatus === 'paid' ? '' : 'gold'}">${statusLabels[order.paymentStatus]}</span>
-        <span class="tag">${paymentMethodLabel(order.paymentMethod)}</span>
-        <span class="tag ${order.receivedStatus === 'received' ? '' : 'gold'}">${statusLabels[order.receivedStatus || 'not_received']}</span>
+        ${
+          order.paymentStatus === 'paid'
+            ? `<span class="tag">Pago - falta entregar</span>`
+            : `<span class="tag gold">Pagamento pendente</span>`
+        }
         <span class="tag ${order.deliveryStatus === 'delivered' ? '' : 'blue'}">${statusLabels[order.deliveryStatus]}</span>
       </div>
 
@@ -339,12 +341,16 @@ function adminOrderControlsTemplate(order) {
 function summaryTemplate() {
   const summary = state.summary || {
     totalSold: 0,
+    byPaymentMethod: { cash: 0, pix: 0, credit: 0, debit: 0 },
     ordersCount: 0,
     paidCount: 0,
     pendingPaymentCount: 0,
     deliveredCount: 0,
     waitingDeliveryCount: 0
   };
+  const sales = [...state.orders]
+    .filter(order => order.paymentStatus === 'paid' || order.deliveryStatus === 'delivered')
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
   return `
     <section class="panel">
@@ -363,6 +369,47 @@ function summaryTemplate() {
         ${metricTemplate('Na entrega', summary.waitingDeliveryCount)}
       </div>
     </section>
+
+    <section class="panel">
+      <div class="panel-header">
+        <div>
+          <p class="eyebrow">Recebimentos</p>
+          <h2>Total por forma de pagamento</h2>
+        </div>
+      </div>
+      <div class="summary-grid">
+        ${metricTemplate('Dinheiro', money.format(summary.byPaymentMethod?.cash || 0))}
+        ${metricTemplate('PIX', money.format(summary.byPaymentMethod?.pix || 0))}
+        ${metricTemplate('Credito', money.format(summary.byPaymentMethod?.credit || 0))}
+        ${metricTemplate('Debito', money.format(summary.byPaymentMethod?.debit || 0))}
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header">
+        <div>
+          <p class="eyebrow">Historico</p>
+          <h2>Lista de vendas</h2>
+        </div>
+        <span class="tag">${sales.length} vendas</span>
+      </div>
+      <div class="sale-list">
+        ${sales.map(saleTemplate).join('') || `<p class="empty">Nenhuma venda concluida ainda.</p>`}
+      </div>
+    </section>
+  `;
+}
+
+function saleTemplate(order) {
+  return `
+    <article class="sale-card">
+      <div>
+        <strong>${escapeHtml(order.customerName)}</strong>
+        <small>${escapeHtml(order.code)} - ${formatDate(order.createdAt)} - ${paymentMethodLabel(order.paymentMethod)}</small>
+      </div>
+      <strong class="price">${money.format(order.total)}</strong>
+      <button class="danger-button" data-delete-order="${order.id}" type="button">Excluir venda</button>
+    </article>
   `;
 }
 

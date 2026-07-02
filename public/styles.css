@@ -355,7 +355,8 @@ button {
 
 .cart-list,
 .order-list,
-.admin-list {
+.admin-list,
+.sale-list {
   display: grid;
   gap: 10px;
   padding: 16px;
@@ -370,7 +371,8 @@ button {
 
 .cart-row,
 .order-card,
-.admin-product {
+.admin-product,
+.sale-card {
   display: grid;
   gap: 10px;
   padding: 12px;
@@ -382,6 +384,20 @@ button {
 .cart-row {
   grid-template-columns: 1fr auto;
   align-items: center;
+}
+
+.sale-card {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+}
+
+.sale-card strong,
+.sale-card small {
+  display: block;
+}
+
+.sale-card small {
+  color: var(--muted);
 }
 
 .quantity {
@@ -603,6 +619,10 @@ button {
   .catalog-tools,
   .status-controls,
   .summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .sale-card {
     grid-template-columns: 1fr;
   }
 
