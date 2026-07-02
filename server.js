@@ -225,6 +225,7 @@ app.post('/api/orders', async (req, res) => {
     total: orderTotal(orderItems, data.products),
     paymentMethod: ['pix', 'credit', 'debit', 'cash'].includes(paymentMethod) ? paymentMethod : 'cash',
     paymentStatus: paymentStatus === 'paid' ? 'paid' : 'pending',
+    receivedStatus: 'not_received',
     deliveryStatus: 'waiting',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
@@ -244,6 +245,7 @@ app.patch('/api/orders/:id', async (req, res) => {
   }
 
   const allowedPayment = ['pending', 'paid', 'cancelled'];
+  const allowedReceived = ['not_received', 'received'];
   const allowedDelivery = ['waiting', 'preparing', 'out', 'delivered', 'cancelled'];
 
   if (allowedPayment.includes(req.body.paymentStatus)) {
@@ -252,6 +254,10 @@ app.patch('/api/orders/:id', async (req, res) => {
 
   if (['pix', 'credit', 'debit', 'cash'].includes(req.body.paymentMethod)) {
     data.orders[index].paymentMethod = req.body.paymentMethod;
+  }
+
+  if (allowedReceived.includes(req.body.receivedStatus)) {
+    data.orders[index].receivedStatus = req.body.receivedStatus;
   }
 
   if (allowedDelivery.includes(req.body.deliveryStatus)) {

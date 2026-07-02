@@ -27,6 +27,8 @@ const statusLabels = {
   pending: 'Nao pago',
   paid: 'Pago',
   cancelled: 'Cancelado',
+  not_received: 'Nao recebido',
+  received: 'Recebido',
   waiting: 'Na fila',
   preparing: 'Preparando',
   out: 'Saiu para entrega',
@@ -256,6 +258,7 @@ function orderTemplate(order) {
       <div class="order-statuses">
         <span class="tag ${order.paymentStatus === 'paid' ? '' : 'gold'}">${statusLabels[order.paymentStatus]}</span>
         <span class="tag">${paymentMethodLabel(order.paymentMethod)}</span>
+        <span class="tag ${order.receivedStatus === 'received' ? '' : 'gold'}">${statusLabels[order.receivedStatus || 'not_received']}</span>
         <span class="tag ${order.deliveryStatus === 'delivered' ? '' : 'blue'}">${statusLabels[order.deliveryStatus]}</span>
       </div>
 
@@ -272,6 +275,9 @@ function adminOrderControlsTemplate(order) {
       </select>
       <select class="select" data-payment-method="${order.id}">
         ${['cash', 'pix', 'credit', 'debit'].map(method => `<option value="${method}" ${method === (order.paymentMethod || 'cash') ? 'selected' : ''}>${paymentMethodLabel(method)}</option>`).join('')}
+      </select>
+      <select class="select" data-received="${order.id}">
+        ${['not_received', 'received'].map(status => `<option value="${status}" ${status === (order.receivedStatus || 'not_received') ? 'selected' : ''}>${statusLabels[status]}</option>`).join('')}
       </select>
       <select class="select" data-delivery="${order.id}">
         ${['waiting', 'preparing', 'out', 'delivered', 'cancelled'].map(status => `<option value="${status}" ${status === order.deliveryStatus ? 'selected' : ''}>${statusLabels[status]}</option>`).join('')}
@@ -426,6 +432,10 @@ function bindEvents() {
 
   document.querySelectorAll('[data-payment-method]').forEach(select => {
     select.addEventListener('change', () => updateOrder(select.dataset.paymentMethod, { paymentMethod: select.value }));
+  });
+
+  document.querySelectorAll('[data-received]').forEach(select => {
+    select.addEventListener('change', () => updateOrder(select.dataset.received, { receivedStatus: select.value }));
   });
 
   document.querySelectorAll('[data-delivery]').forEach(select => {
