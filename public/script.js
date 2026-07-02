@@ -172,8 +172,8 @@ function cartTemplate() {
 
       <form class="checkout-form" data-checkout>
         <input class="input" name="customerName" placeholder="Seu nome" required />
-        <input class="input" name="phone" placeholder="WhatsApp" required />
-        <input class="input" name="address" placeholder="Endereco para entrega" required />
+        <input class="input" name="phone" placeholder="WhatsApp (opcional)" />
+        <input class="input" name="address" placeholder="Endereco para entrega (opcional)" />
         <select class="select" name="paymentMethod" required>
           <option value="cash">Dinheiro</option>
           <option value="credit">Credito</option>
@@ -231,7 +231,7 @@ function orderTemplate(order) {
     <ol class="order-items">
       ${order.items.map(item => `<li>${item.quantity}x ${escapeHtml(item.name)} - ${money.format(item.price * item.quantity)}</li>`).join('')}
     </ol>
-    <small>Telefone: ${escapeHtml(order.phone)} | Entrega: ${escapeHtml(order.address)}</small>
+    ${order.phone || order.address ? `<small>${order.phone ? `Telefone: ${escapeHtml(order.phone)}` : ''}${order.phone && order.address ? ' | ' : ''}${order.address ? `Entrega: ${escapeHtml(order.address)}` : ''}</small>` : ''}
     ${order.notes ? `<small>${escapeHtml(order.notes)}</small>` : ''}
     <strong class="price">${money.format(order.total)}</strong>
   ` : '';

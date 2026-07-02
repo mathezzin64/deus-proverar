@@ -186,8 +186,8 @@ app.delete('/api/products/:id', async (req, res) => {
 app.post('/api/orders', async (req, res) => {
   const { customerName, phone, address, notes, items, paymentMethod, paymentStatus } = req.body;
 
-  if (!customerName || !phone || !address || !Array.isArray(items) || !items.length) {
-    return res.status(400).json({ error: 'Informe cliente, telefone, endereco e produtos.' });
+  if (!customerName || !Array.isArray(items) || !items.length) {
+    return res.status(400).json({ error: 'Informe o nome e pelo menos um produto.' });
   }
 
   const data = await readData();
@@ -212,8 +212,8 @@ app.post('/api/orders', async (req, res) => {
     id: makeId('pedido'),
     code: `DP-${String(data.orders.length + 1).padStart(3, '0')}`,
     customerName: String(customerName).trim(),
-    phone: String(phone).trim(),
-    address: String(address).trim(),
+    phone: String(phone || '').trim(),
+    address: String(address || '').trim(),
     notes: String(notes || '').trim(),
     items: orderItems,
     total: orderTotal(orderItems, data.products),
