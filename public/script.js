@@ -19,7 +19,9 @@ const state = {
   activeTab: initialActiveTab,
   adminOpen: initialActiveTab === 'fila' || initialActiveTab === 'produtos',
   productEditingId: null,
-  toast: ''
+  toast: '',
+  touchStartY: 0,
+  refreshing: false
 };
 
 const money = new Intl.NumberFormat('pt-BR', {
@@ -81,6 +83,7 @@ async function loadState() {
 function render() {
   app.innerHTML = `
     <main class="shell">
+      <div class="pull-refresh ${state.refreshing ? 'active' : ''}">Atualizando...</div>
       <header class="topbar">
         <div class="brand">
           <img src="/logo.svg" alt="DEUS PROVERAR" />
@@ -254,7 +257,9 @@ function cartItemTemplate(item) {
 }
 
 function ordersTemplate() {
-  const orders = [...state.orders].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+  const orders = [...state.orders]
+    .filter(order => order.deliveryStatus !== 'delivered' && order.deliveryStatus !== 'cancelled')
+    .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
 
   return `
     <section class="panel" id="orders">
@@ -303,6 +308,7 @@ function orderTemplate(order) {
       </div>
 
       <div class="order-actions">
+        <button class="button" data-deliver-order="${order.id}" type="button">Entregue</button>
         <button class="danger-button" data-delete-order="${order.id}" type="button">Excluir pedido</button>
       </div>
 
@@ -503,6 +509,15 @@ function bindEvents() {
   document.querySelectorAll('[data-delete-order]').forEach(button => {
     button.addEventListener('click', () => deleteOrder(button.dataset.deleteOrder));
   });
+
+  document.querySelectorAll('[data-deliver-order]').forEach(button => {
+    button.addEventListener('click', () => markDelivered(button.dataset.deliverOrder));
+  });
+
+  window.removeEventListener('touchstart', handlePullStart);
+  window.removeEventListener('touchend', handlePullEnd);
+  window.addEventListener('touchstart', handlePullStart, { passive: true });
+  window.addEventListener('touchend', handlePullEnd, { passive: true });
 }
 
 function filteredProducts() {
@@ -689,6 +704,19 @@ async function updateOrder(orderId, payload) {
   }
 }
 
+async function markDelivered(orderId) {
+  try {
+    await api(`/api/orders/${orderId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ deliveryStatus: 'delivered', receivedStatus: 'received' })
+    });
+    showToast('Pedido marcado como entregue.');
+    await loadState();
+  } catch (error) {
+    showToast(error.message);
+  }
+}
+
 async function deleteOrder(orderId) {
   if (!confirm('Remover este pedido da fila?')) return;
 
@@ -708,6 +736,25 @@ function showToast(message) {
     state.toast = '';
     render();
   }, 2600);
+}
+
+function handlePullStart(event) {
+  if (window.scrollY <= 0) {
+    state.touchStartY = event.touches?.[0]?.clientY || 0;
+  }
+}
+
+async function handlePullEnd(event) {
+  const endY = event.changedTouches?.[0]?.clientY || 0;
+  const pulled = endY - state.touchStartY;
+
+  if (window.scrollY <= 0 && pulled > 70 && !state.refreshing) {
+    state.refreshing = true;
+    render();
+    await loadState();
+    state.refreshing = false;
+    showToast('App atualizado.');
+  }
 }
 
 function readJson(key, fallback) {
