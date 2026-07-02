@@ -15,7 +15,7 @@ const defaultProducts = [
     description: 'Churrasco mais refrigerante de 200 ml.',
     price: 23,
     category: 'Lanches',
-    image: '/img/churrasco-completo.svg',
+    image: 'https://images.unsplash.com/photo-1529193591184-b1d58069ecdd?auto=format&fit=crop&w=900&q=80',
     available: true,
     highlight: true
   },
@@ -25,7 +25,7 @@ const defaultProducts = [
     description: 'Completo.',
     price: 20,
     category: 'Lanches',
-    image: '/img/churrasco.svg',
+    image: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&w=900&q=80',
     available: true,
     highlight: true
   },
@@ -35,7 +35,7 @@ const defaultProducts = [
     description: 'Agua mineral gelada.',
     price: 3,
     category: 'Bebidas',
-    image: '/img/agua.svg',
+    image: 'https://images.unsplash.com/photo-1523362628745-0c100150b504?auto=format&fit=crop&w=900&q=80',
     available: true,
     highlight: false
   },
@@ -45,7 +45,7 @@ const defaultProducts = [
     description: 'Salgado pronto para lanche.',
     price: 8,
     category: 'Salgados',
-    image: '/img/salgado.svg',
+    image: 'https://images.unsplash.com/photo-1626200419199-391ae4be7a41?auto=format&fit=crop&w=900&q=80',
     available: true,
     highlight: false
   }
@@ -76,6 +76,12 @@ async function ensureDatabase() {
         return !defaultId && !oldSample;
       });
       data.products = [...defaultProducts, ...customProducts];
+      await writeData(data);
+    } else {
+      data.products = data.products.map(product => {
+        const defaultProduct = defaultProducts.find(candidate => candidate.id === product.id);
+        return defaultProduct ? { ...product, ...defaultProduct } : product;
+      });
       await writeData(data);
     }
   } catch {
@@ -217,7 +223,7 @@ app.post('/api/orders', async (req, res) => {
     notes: String(notes || '').trim(),
     items: orderItems,
     total: orderTotal(orderItems, data.products),
-    paymentMethod: ['credit', 'debit', 'cash'].includes(paymentMethod) ? paymentMethod : 'cash',
+    paymentMethod: ['pix', 'credit', 'debit', 'cash'].includes(paymentMethod) ? paymentMethod : 'cash',
     paymentStatus: paymentStatus === 'paid' ? 'paid' : 'pending',
     deliveryStatus: 'waiting',
     createdAt: new Date().toISOString(),
@@ -244,7 +250,7 @@ app.patch('/api/orders/:id', async (req, res) => {
     data.orders[index].paymentStatus = req.body.paymentStatus;
   }
 
-  if (['credit', 'debit', 'cash'].includes(req.body.paymentMethod)) {
+  if (['pix', 'credit', 'debit', 'cash'].includes(req.body.paymentMethod)) {
     data.orders[index].paymentMethod = req.body.paymentMethod;
   }
 

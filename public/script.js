@@ -2,6 +2,14 @@ const state = {
   products: [],
   orders: [],
   cart: readJson('deus-proverar-cart', []),
+  checkout: readJson('deus-proverar-checkout', {
+    customerName: '',
+    phone: '',
+    address: '',
+    paymentMethod: 'cash',
+    paymentStatus: 'pending',
+    notes: ''
+  }),
   summary: null,
   category: 'Todos',
   search: '',
@@ -171,19 +179,17 @@ function cartTemplate() {
       </div>
 
       <form class="checkout-form" data-checkout>
-        <input class="input" name="customerName" placeholder="Seu nome" required />
-        <input class="input" name="phone" placeholder="WhatsApp (opcional)" />
-        <input class="input" name="address" placeholder="Endereco para entrega (opcional)" />
+        <input class="input" name="customerName" data-checkout-field placeholder="Seu nome" value="${escapeHtml(state.checkout.customerName)}" required />
+        <input class="input" name="phone" data-checkout-field placeholder="WhatsApp (opcional)" value="${escapeHtml(state.checkout.phone)}" />
+        <input class="input" name="address" data-checkout-field placeholder="Endereco para entrega (opcional)" value="${escapeHtml(state.checkout.address)}" />
         <select class="select" name="paymentMethod" required>
-          <option value="cash">Dinheiro</option>
-          <option value="credit">Credito</option>
-          <option value="debit">Debito</option>
+          ${['cash', 'pix', 'credit', 'debit'].map(method => `<option value="${method}" ${method === state.checkout.paymentMethod ? 'selected' : ''}>${paymentMethodLabel(method)}</option>`).join('')}
         </select>
         <select class="select" name="paymentStatus" required>
-          <option value="pending">Vai pagar ainda</option>
-          <option value="paid">Ja pagou</option>
+          <option value="pending" ${state.checkout.paymentStatus === 'pending' ? 'selected' : ''}>Vai pagar ainda</option>
+          <option value="paid" ${state.checkout.paymentStatus === 'paid' ? 'selected' : ''}>Ja pagou</option>
         </select>
-        <textarea class="textarea" name="notes" placeholder="Observacoes: ponto da carne, troco, retirada..."></textarea>
+        <textarea class="textarea" name="notes" data-checkout-field placeholder="Observacoes: ponto da carne, troco, retirada...">${escapeHtml(state.checkout.notes)}</textarea>
         <button class="button" ${items.length ? '' : 'disabled'} type="submit">Enviar pedido</button>
       </form>
     </section>
@@ -265,7 +271,7 @@ function adminOrderControlsTemplate(order) {
         ${['pending', 'paid', 'cancelled'].map(status => `<option value="${status}" ${status === order.paymentStatus ? 'selected' : ''}>${statusLabels[status]}</option>`).join('')}
       </select>
       <select class="select" data-payment-method="${order.id}">
-        ${['cash', 'credit', 'debit'].map(method => `<option value="${method}" ${method === (order.paymentMethod || 'cash') ? 'selected' : ''}>${paymentMethodLabel(method)}</option>`).join('')}
+        ${['cash', 'pix', 'credit', 'debit'].map(method => `<option value="${method}" ${method === (order.paymentMethod || 'cash') ? 'selected' : ''}>${paymentMethodLabel(method)}</option>`).join('')}
       </select>
       <select class="select" data-delivery="${order.id}">
         ${['waiting', 'preparing', 'out', 'delivered', 'cancelled'].map(status => `<option value="${status}" ${status === order.deliveryStatus ? 'selected' : ''}>${statusLabels[status]}</option>`).join('')}
@@ -383,6 +389,10 @@ function bindEvents() {
   });
 
   document.querySelector('[data-checkout]')?.addEventListener('submit', submitOrder);
+  document.querySelectorAll('[data-checkout] input, [data-checkout] textarea, [data-checkout] select').forEach(field => {
+    field.addEventListener('input', updateCheckoutDraft);
+    field.addEventListener('change', updateCheckoutDraft);
+  });
   document.querySelector('[data-admin-toggle]')?.addEventListener('click', () => {
     state.adminOpen = !state.adminOpen;
     render();
@@ -495,6 +505,15 @@ async function submitOrder(event) {
       body: JSON.stringify(payload)
     });
     state.cart = [];
+    state.checkout = {
+      customerName: '',
+      phone: '',
+      address: '',
+      paymentMethod: 'cash',
+      paymentStatus: 'pending',
+      notes: ''
+    };
+    localStorage.removeItem('deus-proverar-checkout');
     saveCart();
     event.target.reset();
     showToast('Pedido enviado e entrou na fila.');
@@ -502,6 +521,14 @@ async function submitOrder(event) {
   } catch (error) {
     showToast(error.message);
   }
+}
+
+function updateCheckoutDraft(event) {
+  state.checkout = {
+    ...state.checkout,
+    [event.target.name]: event.target.value
+  };
+  localStorage.setItem('deus-proverar-checkout', JSON.stringify(state.checkout));
 }
 
 async function submitProduct(event) {
@@ -596,6 +623,7 @@ function formatDate(value) {
 function paymentMethodLabel(method) {
   return {
     cash: 'Dinheiro',
+    pix: 'PIX',
     credit: 'Credito',
     debit: 'Debito'
   }[method] || 'Dinheiro';
