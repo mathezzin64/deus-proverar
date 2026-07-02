@@ -10,3 +10,7 @@ services:
         value: 22.12.0
       - key: ADMIN_PASSWORD
         sync: false
+      - key: MONGODB_URI
+        sync: false
+      - key: MONGODB_DB
+        value: deus_proverar

@@ -2,11 +2,15 @@ const fs = require('fs/promises');
 const path = require('path');
 const express = require('express');
 const cors = require('cors');
+const { MongoClient } = require('mongodb');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const dataDir = path.join(__dirname, 'data');
 const dataFile = path.join(dataDir, 'database.json');
+const mongoUri = process.env.MONGODB_URI;
+const mongoDbName = process.env.MONGODB_DB || 'deus_proverar';
+let mongoCollection = null;
 
 const defaultProducts = [
   {
@@ -64,38 +68,43 @@ app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
+async function getMongoCollection() {
+  if (!mongoUri) {
+    return null;
+  }
+
+  if (mongoCollection) {
+    return mongoCollection;
+  }
+
+  const client = new MongoClient(mongoUri);
+  await client.connect();
+  mongoCollection = client.db(mongoDbName).collection('app_state');
+  return mongoCollection;
+}
+
 async function ensureDatabase() {
+  const collection = await getMongoCollection();
+
+  if (collection) {
+    const existing = await collection.findOne({ _id: 'main' });
+
+    if (!existing) {
+      await collection.updateOne({ _id: 'main' }, { $set: initialData }, { upsert: true });
+      return;
+    }
+
+    const migrated = migrateData(existing);
+    await collection.updateOne({ _id: 'main' }, { $set: migrated }, { upsert: true });
+    return;
+  }
+
   await fs.mkdir(dataDir, { recursive: true });
 
   try {
     await fs.access(dataFile);
     const data = JSON.parse(await fs.readFile(dataFile, 'utf8'));
-    const hasOldSamples = data.products?.some(product => product.id === 'lanche-001' || product.id === 'bebida-001');
-    const hasDefaultProducts = defaultProducts.every(product => data.products?.some(saved => saved.id === product.id));
-
-    if (hasOldSamples || !hasDefaultProducts) {
-      const customProducts = (data.products || []).filter(product => {
-        const defaultId = defaultProducts.some(defaultProduct => defaultProduct.id === product.id);
-        const oldSample = product.id === 'lanche-001' || product.id === 'bebida-001';
-        return !defaultId && !oldSample;
-      });
-      data.products = [...defaultProducts, ...customProducts];
-      await writeData(data);
-    } else {
-      data.products = data.products.map(product => {
-        const defaultProduct = defaultProducts.find(candidate => candidate.id === product.id);
-        return defaultProduct
-          ? {
-              ...product,
-              ...defaultProduct,
-              stock: Number.isFinite(Number(product.stock)) ? Number(product.stock) : defaultProduct.stock,
-              available: product.available ?? defaultProduct.available,
-              highlight: product.highlight ?? defaultProduct.highlight
-            }
-          : { ...product, stock: Number(product.stock || 0) };
-      });
-      await writeData(data);
-    }
+    await writeData(migrateData(data));
   } catch {
     await writeData(initialData);
   }
@@ -103,13 +112,61 @@ async function ensureDatabase() {
 
 async function readData() {
   await ensureDatabase();
+  const collection = await getMongoCollection();
+
+  if (collection) {
+    const data = await collection.findOne({ _id: 'main' });
+    return migrateData(data || initialData);
+  }
+
   const raw = await fs.readFile(dataFile, 'utf8');
   return JSON.parse(raw);
 }
 
 async function writeData(data) {
+  const collection = await getMongoCollection();
+
+  if (collection) {
+    await collection.updateOne({ _id: 'main' }, { $set: migrateData(data) }, { upsert: true });
+    return;
+  }
+
   await fs.mkdir(dataDir, { recursive: true });
   await fs.writeFile(dataFile, JSON.stringify(data, null, 2));
+}
+
+function migrateData(data) {
+  const safeData = {
+    products: Array.isArray(data?.products) ? data.products : [],
+    orders: Array.isArray(data?.orders) ? data.orders : []
+  };
+
+  const hasOldSamples = safeData.products.some(product => product.id === 'lanche-001' || product.id === 'bebida-001');
+  const hasDefaultProducts = defaultProducts.every(product => safeData.products.some(saved => saved.id === product.id));
+
+  if (hasOldSamples || !hasDefaultProducts) {
+    const customProducts = safeData.products.filter(product => {
+      const defaultId = defaultProducts.some(defaultProduct => defaultProduct.id === product.id);
+      const oldSample = product.id === 'lanche-001' || product.id === 'bebida-001';
+      return !defaultId && !oldSample;
+    });
+    safeData.products = [...defaultProducts, ...customProducts];
+  } else {
+    safeData.products = safeData.products.map(product => {
+      const defaultProduct = defaultProducts.find(candidate => candidate.id === product.id);
+      return defaultProduct
+        ? {
+            ...product,
+            ...defaultProduct,
+            stock: Number.isFinite(Number(product.stock)) ? Number(product.stock) : defaultProduct.stock,
+            available: product.available ?? defaultProduct.available,
+            highlight: product.highlight ?? defaultProduct.highlight
+          }
+        : { ...product, stock: Number(product.stock || 0) };
+    });
+  }
+
+  return safeData;
 }
 
 function makeId(prefix) {

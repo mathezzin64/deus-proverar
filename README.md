@@ -40,10 +40,17 @@ O projeto ja inclui `render.yaml`.
 
 ## Dados
 
-Os dados ficam em:
+Em producao, use MongoDB para os dados nao sumirem:
+
+```txt
+MONGODB_URI=mongodb+srv://...
+MONGODB_DB=deus_proverar
+```
+
+Rodando localmente sem `MONGODB_URI`, o app usa fallback em:
 
 ```txt
 data/database.json
 ```
 
-Esse arquivo nao entra no Git, para nao vazar pedidos reais.
+Esse arquivo local nao entra no Git, para nao vazar pedidos reais.

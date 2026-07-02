@@ -1,3 +1,5 @@
+const initialActiveTab = localStorage.getItem('deus-proverar-tab') || 'inicio';
+
 const state = {
   products: [],
   orders: [],
@@ -14,7 +16,8 @@ const state = {
   summary: null,
   category: 'Todos',
   search: '',
-  adminOpen: false,
+  activeTab: initialActiveTab,
+  adminOpen: initialActiveTab === 'fila' || initialActiveTab === 'produtos',
   productEditingId: null,
   toast: ''
 };
@@ -86,28 +89,46 @@ function render() {
             <span>Churrasco e lanches</span>
           </div>
         </div>
-        <div class="nav-actions">
-          <button class="ghost-button" data-scroll="orders" type="button">Fila de pedidos</button>
-          <button class="ghost-button" data-admin-toggle type="button">${state.adminOpen ? 'Fechar painel' : 'Painel master'}</button>
-        </div>
       </header>
 
-      <section class="page">
-        <div class="main-column">
-          ${catalogTemplate()}
-          ${ordersTemplate()}
-          ${adminTemplate()}
-        </div>
-        <aside class="side-column">
-          ${cartTemplate()}
-          ${summaryTemplate()}
-        </aside>
-      </section>
+      <nav class="app-menu" aria-label="Menu principal">
+        ${tabButton('inicio', 'Inicio')}
+        ${tabButton('fila', 'Fila')}
+        ${tabButton('produtos', 'Produtos')}
+        ${tabButton('painel', 'Painel')}
+      </nav>
+
+      ${activePageTemplate()}
     </main>
     ${state.toast ? `<div class="toast">${escapeHtml(state.toast)}</div>` : ''}
   `;
 
   bindEvents();
+}
+
+function tabButton(tab, label) {
+  return `<button class="${state.activeTab === tab ? 'active' : ''}" data-tab="${tab}" type="button">${label}</button>`;
+}
+
+function activePageTemplate() {
+  if (state.activeTab === 'fila') {
+    return `<section class="page single-page"><div class="main-column">${ordersTemplate()}</div></section>`;
+  }
+
+  if (state.activeTab === 'produtos') {
+    return `<section class="page single-page"><div class="main-column">${adminTemplate()}</div></section>`;
+  }
+
+  if (state.activeTab === 'painel') {
+    return `<section class="page single-page"><div class="main-column">${summaryTemplate()}</div></section>`;
+  }
+
+  return `
+    <section class="page">
+      <div class="main-column">${catalogTemplate()}</div>
+      <aside class="side-column">${cartTemplate()}</aside>
+    </section>
+  `;
 }
 
 function catalogTemplate() {
@@ -347,7 +368,7 @@ function adminTemplate() {
   const editingProduct = state.products.find(product => product.id === state.productEditingId);
 
   return `
-    <section class="panel admin-shell ${state.adminOpen ? 'active' : ''}">
+    <section class="panel admin-shell active">
       <div class="panel-header">
         <div>
           <p class="eyebrow">Controle livre</p>
@@ -423,6 +444,19 @@ function bindEvents() {
     field.addEventListener('input', updateCheckoutDraft);
     field.addEventListener('change', updateCheckoutDraft);
   });
+  document.querySelectorAll('[data-tab]').forEach(button => {
+    button.addEventListener('click', () => {
+      state.activeTab = button.dataset.tab;
+      state.adminOpen = button.dataset.tab === 'produtos' || button.dataset.tab === 'fila';
+      localStorage.setItem('deus-proverar-tab', state.activeTab);
+      render();
+    });
+  });
+
+  if (state.activeTab === 'produtos' || state.activeTab === 'fila') {
+    state.adminOpen = true;
+  }
+
   document.querySelector('[data-admin-toggle]')?.addEventListener('click', () => {
     state.adminOpen = !state.adminOpen;
     render();
