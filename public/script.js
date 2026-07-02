@@ -19,6 +19,7 @@ const state = {
   activeTab: initialActiveTab,
   adminOpen: initialActiveTab === 'fila' || initialActiveTab === 'produtos',
   productEditingId: null,
+  productDraft: readJson('deus-proverar-product-draft', {}),
   toast: '',
   touchStartY: 0,
   refreshing: false
@@ -47,8 +48,8 @@ init();
 
 async function init() {
   render();
-  await loadState();
-  setInterval(loadState, 5000);
+  await loadState({ forceRender: true });
+  setInterval(() => loadState({ background: true }), 5000);
 }
 
 async function api(path, options = {}) {
@@ -68,15 +69,20 @@ async function api(path, options = {}) {
   return response.json();
 }
 
-async function loadState() {
+async function loadState(options = {}) {
   try {
     const [data, summary] = await Promise.all([api('/api/state'), api('/api/summary')]);
     state.products = data.products || [];
     state.orders = data.orders || [];
     state.summary = summary;
-    render();
+
+    if (options.forceRender || !isUserEditing()) {
+      render();
+    }
   } catch (error) {
-    showToast(error.message);
+    if (!options.background) {
+      showToast(error.message);
+    }
   }
 }
 
@@ -419,6 +425,19 @@ function metricTemplate(label, value) {
 
 function adminTemplate() {
   const editingProduct = state.products.find(product => product.id === state.productEditingId);
+  const draftId = editingProduct?.id || '';
+  const draft = state.productDraft?.id === draftId ? state.productDraft : {};
+  const productForm = {
+    id: draftId,
+    name: draft.name ?? editingProduct?.name ?? '',
+    category: draft.category ?? editingProduct?.category ?? 'Lanches',
+    price: draft.price ?? editingProduct?.price ?? '',
+    stock: draft.stock ?? editingProduct?.stock ?? '',
+    image: draft.image ?? editingProduct?.image ?? '',
+    description: draft.description ?? editingProduct?.description ?? '',
+    available: draft.available ?? editingProduct?.available ?? true,
+    highlight: draft.highlight ?? editingProduct?.highlight ?? false
+  };
 
   return `
     <section class="panel admin-shell active">
@@ -431,15 +450,15 @@ function adminTemplate() {
       </div>
 
       <form class="admin-form" data-product-form>
-        <input type="hidden" name="id" value="${editingProduct?.id || ''}" />
-        <input class="input" name="name" placeholder="Nome do produto" value="${escapeHtml(editingProduct?.name || '')}" required />
-        <input class="input" name="category" placeholder="Categoria" value="${escapeHtml(editingProduct?.category || 'Lanches')}" required />
-        <input class="input" name="price" type="number" step="0.01" min="0" placeholder="Valor" value="${editingProduct?.price || ''}" required />
-        <input class="input" name="stock" type="number" step="1" min="0" placeholder="Quantidade em estoque" value="${editingProduct?.stock ?? ''}" required />
-        <input class="input" name="image" placeholder="Imagem ou URL" value="${escapeHtml(editingProduct?.image || '')}" />
-        <textarea class="textarea" name="description" placeholder="Descricao do produto" required>${escapeHtml(editingProduct?.description || '')}</textarea>
-        <label><input name="available" type="checkbox" ${editingProduct?.available ?? true ? 'checked' : ''} /> Produto disponivel</label>
-        <label><input name="highlight" type="checkbox" ${editingProduct?.highlight ? 'checked' : ''} /> Marcar como destaque</label>
+        <input type="hidden" name="id" value="${productForm.id}" />
+        <input class="input" name="name" data-product-field placeholder="Nome do produto" value="${escapeHtml(productForm.name)}" required />
+        <input class="input" name="category" data-product-field placeholder="Categoria" value="${escapeHtml(productForm.category)}" required />
+        <input class="input" name="price" data-product-field type="number" step="0.01" min="0" placeholder="Valor" value="${escapeHtml(productForm.price)}" required />
+        <input class="input" name="stock" data-product-field type="number" step="1" min="0" placeholder="Quantidade em estoque" value="${escapeHtml(productForm.stock)}" required />
+        <input class="input" name="image" data-product-field placeholder="Imagem ou URL" value="${escapeHtml(productForm.image)}" />
+        <textarea class="textarea" name="description" data-product-field placeholder="Descricao do produto" required>${escapeHtml(productForm.description)}</textarea>
+        <label><input name="available" data-product-field type="checkbox" ${productForm.available ? 'checked' : ''} /> Produto disponivel</label>
+        <label><input name="highlight" data-product-field type="checkbox" ${productForm.highlight ? 'checked' : ''} /> Marcar como destaque</label>
         <button class="button" type="submit">${editingProduct ? 'Salvar produto' : 'Adicionar produto'}</button>
         ${editingProduct ? `<button class="ghost-button" data-cancel-edit type="button">Cancelar edicao</button>` : ''}
       </form>
@@ -520,15 +539,24 @@ function bindEvents() {
   });
 
   document.querySelector('[data-product-form]')?.addEventListener('submit', submitProduct);
+  document.querySelectorAll('[data-product-field]').forEach(field => {
+    field.addEventListener('input', updateProductDraft);
+    field.addEventListener('change', updateProductDraft);
+  });
 
   document.querySelector('[data-cancel-edit]')?.addEventListener('click', () => {
     state.productEditingId = null;
+    clearProductDraft();
     render();
   });
 
   document.querySelectorAll('[data-edit-product]').forEach(button => {
     button.addEventListener('click', () => {
       state.productEditingId = button.dataset.editProduct;
+      const product = state.products.find(candidate => candidate.id === state.productEditingId);
+
+      state.productDraft = productToDraft(product);
+      saveProductDraft();
       render();
     });
   });
@@ -671,7 +699,7 @@ async function submitOrder(event) {
     saveCart();
     event.target.reset();
     showToast('Pedido enviado e entrou na fila.');
-    await loadState();
+    await loadState({ forceRender: true });
   } catch (error) {
     showToast(error.message);
   }
@@ -720,8 +748,9 @@ async function submitProduct(event) {
       body: JSON.stringify(payload)
     });
     state.productEditingId = null;
+    clearProductDraft();
     showToast(id ? 'Produto atualizado.' : 'Produto adicionado.');
-    await loadState();
+    await loadState({ forceRender: true });
   } catch (error) {
     showToast(error.message);
   }
@@ -733,7 +762,7 @@ async function deleteProduct(productId) {
   try {
     await api(`/api/products/${productId}`, { method: 'DELETE' });
     showToast('Produto excluido.');
-    await loadState();
+    await loadState({ forceRender: true });
   } catch (error) {
     showToast(error.message);
   }
@@ -745,7 +774,7 @@ async function updateOrder(orderId, payload) {
       method: 'PATCH',
       body: JSON.stringify(payload)
     });
-    await loadState();
+    await loadState({ forceRender: true });
   } catch (error) {
     showToast(error.message);
   }
@@ -771,7 +800,7 @@ async function markDelivered(orderId, paymentStatus) {
       body: JSON.stringify(payload)
     });
     showToast('Pedido marcado como entregue.');
-    await loadState();
+    await loadState({ forceRender: true });
   } catch (error) {
     showToast(error.message);
   }
@@ -783,7 +812,7 @@ async function deleteOrder(orderId) {
   try {
     await api(`/api/orders/${orderId}`, { method: 'DELETE' });
     showToast('Pedido removido.');
-    await loadState();
+    await loadState({ forceRender: true });
   } catch (error) {
     showToast(error.message);
   }
@@ -798,6 +827,51 @@ function showToast(message) {
   }, 2600);
 }
 
+function updateProductDraft(event) {
+  const form = event.target.closest('[data-product-form]');
+
+  if (!form) {
+    return;
+  }
+
+  const data = new FormData(form);
+  state.productDraft = {
+    id: data.get('id') || '',
+    name: data.get('name') || '',
+    category: data.get('category') || '',
+    price: data.get('price') || '',
+    stock: data.get('stock') || '',
+    image: data.get('image') || '',
+    description: data.get('description') || '',
+    available: data.get('available') === 'on',
+    highlight: data.get('highlight') === 'on'
+  };
+  saveProductDraft();
+}
+
+function productToDraft(product) {
+  return {
+    id: product?.id || '',
+    name: product?.name || '',
+    category: product?.category || 'Lanches',
+    price: product?.price ?? '',
+    stock: product?.stock ?? '',
+    image: product?.image || '',
+    description: product?.description || '',
+    available: product?.available ?? true,
+    highlight: product?.highlight ?? false
+  };
+}
+
+function saveProductDraft() {
+  localStorage.setItem('deus-proverar-product-draft', JSON.stringify(state.productDraft));
+}
+
+function clearProductDraft() {
+  state.productDraft = {};
+  localStorage.removeItem('deus-proverar-product-draft');
+}
+
 function handlePullStart(event) {
   if (window.scrollY <= 0) {
     state.touchStartY = event.touches?.[0]?.clientY || 0;
@@ -808,13 +882,27 @@ async function handlePullEnd(event) {
   const endY = event.changedTouches?.[0]?.clientY || 0;
   const pulled = endY - state.touchStartY;
 
+  if (isUserEditing()) {
+    return;
+  }
+
   if (window.scrollY <= 0 && pulled > 70 && !state.refreshing) {
     state.refreshing = true;
     render();
-    await loadState();
+    await loadState({ forceRender: true });
     state.refreshing = false;
     showToast('App atualizado.');
   }
+}
+
+function isUserEditing() {
+  const active = document.activeElement;
+
+  if (!active) {
+    return false;
+  }
+
+  return Boolean(active.closest('form') && active.matches('input, textarea, select'));
 }
 
 function readJson(key, fallback) {
