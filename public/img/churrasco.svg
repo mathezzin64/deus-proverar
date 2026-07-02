@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 420">
+  <rect width="640" height="420" rx="28" fill="#f8ead0"/>
+  <rect x="85" y="118" width="470" height="190" rx="30" fill="#254333"/>
+  <path d="M125 188h390v63H125z" fill="#f6c46b"/>
+  <path d="M146 151h336c26 0 47 21 47 47H99c0-26 21-47 47-47Z" fill="#a84324"/>
+  <path d="M139 245h362c19 0 34 15 34 34s-15 34-34 34H139c-19 0-34-15-34-34s15-34 34-34Z" fill="#fffaf0"/>
+  <circle cx="198" cy="181" r="11" fill="#4c2819"/>
+  <circle cx="289" cy="181" r="11" fill="#4c2819"/>
+  <circle cx="379" cy="181" r="11" fill="#4c2819"/>
+  <text x="212" y="370" fill="#123026" font-family="Arial" font-size="38" font-weight="900">CHURRASCO</text>
+</svg>

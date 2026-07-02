@@ -5,7 +5,6 @@ const state = {
   summary: null,
   category: 'Todos',
   search: '',
-  adminPassword: sessionStorage.getItem('deus-proverar-admin') || '',
   adminOpen: false,
   productEditingId: null,
   toast: ''
@@ -38,10 +37,6 @@ async function init() {
 
 async function api(path, options = {}) {
   const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
-
-  if (state.adminPassword) {
-    headers['x-admin-password'] = state.adminPassword;
-  }
 
   const response = await fetch(path, { ...options, headers });
 
@@ -77,7 +72,7 @@ function render() {
           <img src="/logo.svg" alt="DEUS PROVERAR" />
           <div>
             <strong>DEUS PROVERAR</strong>
-            <span>Lanches online</span>
+            <span>Churrasco e lanches</span>
           </div>
         </div>
         <div class="nav-actions">
@@ -135,6 +130,7 @@ function catalogTemplate() {
 function productCardTemplate(product) {
   return `
     <article class="product-card">
+      <img class="product-image" src="${escapeHtml(product.image || '/logo.svg')}" alt="${escapeHtml(product.name)}" />
       <div class="product-top">
         <div>
           <span class="tag">${escapeHtml(product.category || 'Lanches')}</span>
@@ -178,6 +174,15 @@ function cartTemplate() {
         <input class="input" name="customerName" placeholder="Seu nome" required />
         <input class="input" name="phone" placeholder="WhatsApp" required />
         <input class="input" name="address" placeholder="Endereco para entrega" required />
+        <select class="select" name="paymentMethod" required>
+          <option value="cash">Dinheiro</option>
+          <option value="credit">Credito</option>
+          <option value="debit">Debito</option>
+        </select>
+        <select class="select" name="paymentStatus" required>
+          <option value="pending">Vai pagar ainda</option>
+          <option value="paid">Ja pagou</option>
+        </select>
         <textarea class="textarea" name="notes" placeholder="Observacoes: ponto da carne, troco, retirada..."></textarea>
         <button class="button" ${items.length ? '' : 'disabled'} type="submit">Enviar pedido</button>
       </form>
@@ -222,28 +227,33 @@ function ordersTemplate() {
 }
 
 function orderTemplate(order) {
+  const adminDetails = state.adminOpen ? `
+    <ol class="order-items">
+      ${order.items.map(item => `<li>${item.quantity}x ${escapeHtml(item.name)} - ${money.format(item.price * item.quantity)}</li>`).join('')}
+    </ol>
+    <small>Telefone: ${escapeHtml(order.phone)} | Entrega: ${escapeHtml(order.address)}</small>
+    ${order.notes ? `<small>${escapeHtml(order.notes)}</small>` : ''}
+    <strong class="price">${money.format(order.total)}</strong>
+  ` : '';
+
   return `
     <article class="order-card ${order.paymentStatus === 'paid' ? 'paid' : ''} ${order.deliveryStatus === 'cancelled' ? 'cancelled' : ''}">
       <div class="order-top">
         <div>
-          <strong>${escapeHtml(order.code)} - ${escapeHtml(order.customerName)}</strong>
-          <small>${formatDate(order.createdAt)} - ${escapeHtml(order.address)}</small>
+          <strong>${escapeHtml(order.customerName)}</strong>
+          <small>${escapeHtml(order.code)} - ${formatDate(order.createdAt)}</small>
         </div>
-        <strong class="price">${money.format(order.total)}</strong>
       </div>
 
-      <ol class="order-items">
-        ${order.items.map(item => `<li>${item.quantity}x ${escapeHtml(item.name)}</li>`).join('')}
-      </ol>
-
-      ${order.notes ? `<small>${escapeHtml(order.notes)}</small>` : ''}
+      ${adminDetails}
 
       <div class="order-statuses">
         <span class="tag ${order.paymentStatus === 'paid' ? '' : 'gold'}">${statusLabels[order.paymentStatus]}</span>
+        <span class="tag">${paymentMethodLabel(order.paymentMethod)}</span>
         <span class="tag ${order.deliveryStatus === 'delivered' ? '' : 'blue'}">${statusLabels[order.deliveryStatus]}</span>
       </div>
 
-      ${state.adminOpen && state.adminPassword ? adminOrderControlsTemplate(order) : ''}
+      ${state.adminOpen ? adminOrderControlsTemplate(order) : ''}
     </article>
   `;
 }
@@ -253,6 +263,9 @@ function adminOrderControlsTemplate(order) {
     <div class="status-controls">
       <select class="select" data-payment="${order.id}">
         ${['pending', 'paid', 'cancelled'].map(status => `<option value="${status}" ${status === order.paymentStatus ? 'selected' : ''}>${statusLabels[status]}</option>`).join('')}
+      </select>
+      <select class="select" data-payment-method="${order.id}">
+        ${['cash', 'credit', 'debit'].map(method => `<option value="${method}" ${method === (order.paymentMethod || 'cash') ? 'selected' : ''}>${paymentMethodLabel(method)}</option>`).join('')}
       </select>
       <select class="select" data-delivery="${order.id}">
         ${['waiting', 'preparing', 'out', 'delivered', 'cancelled'].map(status => `<option value="${status}" ${status === order.deliveryStatus ? 'selected' : ''}>${statusLabels[status]}</option>`).join('')}
@@ -303,37 +316,27 @@ function adminTemplate() {
     <section class="panel admin-shell ${state.adminOpen ? 'active' : ''}">
       <div class="panel-header">
         <div>
-          <p class="eyebrow">Master</p>
-          <h2>Painel de produtos e pedidos</h2>
+          <p class="eyebrow">Controle livre</p>
+          <h2>Produtos e pedidos</h2>
         </div>
-        ${state.adminPassword ? `<span class="tag">Liberado</span>` : `<span class="tag gold">Bloqueado</span>`}
+        <span class="tag">Sem senha</span>
       </div>
 
-      ${
-        state.adminPassword
-          ? `
-            <form class="admin-form" data-product-form>
-              <input type="hidden" name="id" value="${editingProduct?.id || ''}" />
-              <input class="input" name="name" placeholder="Nome do produto" value="${escapeHtml(editingProduct?.name || '')}" required />
-              <input class="input" name="category" placeholder="Categoria" value="${escapeHtml(editingProduct?.category || 'Lanches')}" required />
-              <input class="input" name="price" type="number" step="0.01" min="0" placeholder="Valor" value="${editingProduct?.price || ''}" required />
-              <textarea class="textarea" name="description" placeholder="Descricao do produto" required>${escapeHtml(editingProduct?.description || '')}</textarea>
-              <label><input name="available" type="checkbox" ${editingProduct?.available ?? true ? 'checked' : ''} /> Produto disponivel</label>
-              <label><input name="highlight" type="checkbox" ${editingProduct?.highlight ? 'checked' : ''} /> Marcar como destaque</label>
-              <button class="button" type="submit">${editingProduct ? 'Salvar produto' : 'Adicionar produto'}</button>
-              ${editingProduct ? `<button class="ghost-button" data-cancel-edit type="button">Cancelar edicao</button>` : ''}
-            </form>
-            <div class="admin-list">
-              ${state.products.map(adminProductTemplate).join('')}
-            </div>
-          `
-          : `
-            <form class="admin-form" data-admin-login>
-              <input class="input" name="password" type="password" placeholder="Senha master" required />
-              <button class="button" type="submit">Entrar no painel</button>
-            </form>
-          `
-      }
+      <form class="admin-form" data-product-form>
+        <input type="hidden" name="id" value="${editingProduct?.id || ''}" />
+        <input class="input" name="name" placeholder="Nome do produto" value="${escapeHtml(editingProduct?.name || '')}" required />
+        <input class="input" name="category" placeholder="Categoria" value="${escapeHtml(editingProduct?.category || 'Lanches')}" required />
+        <input class="input" name="price" type="number" step="0.01" min="0" placeholder="Valor" value="${editingProduct?.price || ''}" required />
+        <input class="input" name="image" placeholder="Imagem ou URL" value="${escapeHtml(editingProduct?.image || '')}" />
+        <textarea class="textarea" name="description" placeholder="Descricao do produto" required>${escapeHtml(editingProduct?.description || '')}</textarea>
+        <label><input name="available" type="checkbox" ${editingProduct?.available ?? true ? 'checked' : ''} /> Produto disponivel</label>
+        <label><input name="highlight" type="checkbox" ${editingProduct?.highlight ? 'checked' : ''} /> Marcar como destaque</label>
+        <button class="button" type="submit">${editingProduct ? 'Salvar produto' : 'Adicionar produto'}</button>
+        ${editingProduct ? `<button class="ghost-button" data-cancel-edit type="button">Cancelar edicao</button>` : ''}
+      </form>
+      <div class="admin-list">
+        ${state.products.map(adminProductTemplate).join('')}
+      </div>
     </section>
   `;
 }
@@ -389,7 +392,6 @@ function bindEvents() {
     document.querySelector('#orders')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
 
-  document.querySelector('[data-admin-login]')?.addEventListener('submit', submitAdminLogin);
   document.querySelector('[data-product-form]')?.addEventListener('submit', submitProduct);
 
   document.querySelector('[data-cancel-edit]')?.addEventListener('click', () => {
@@ -410,6 +412,10 @@ function bindEvents() {
 
   document.querySelectorAll('[data-payment]').forEach(select => {
     select.addEventListener('change', () => updateOrder(select.dataset.payment, { paymentStatus: select.value }));
+  });
+
+  document.querySelectorAll('[data-payment-method]').forEach(select => {
+    select.addEventListener('change', () => updateOrder(select.dataset.paymentMethod, { paymentMethod: select.value }));
   });
 
   document.querySelectorAll('[data-delivery]').forEach(select => {
@@ -478,6 +484,8 @@ async function submitOrder(event) {
     phone: form.get('phone'),
     address: form.get('address'),
     notes: form.get('notes'),
+    paymentMethod: form.get('paymentMethod'),
+    paymentStatus: form.get('paymentStatus'),
     items: state.cart
   };
 
@@ -496,24 +504,6 @@ async function submitOrder(event) {
   }
 }
 
-async function submitAdminLogin(event) {
-  event.preventDefault();
-  const password = new FormData(event.target).get('password');
-  state.adminPassword = password;
-  sessionStorage.setItem('deus-proverar-admin', password);
-
-  try {
-    await api('/api/state');
-    showToast('Painel master liberado.');
-    render();
-  } catch (error) {
-    state.adminPassword = '';
-    sessionStorage.removeItem('deus-proverar-admin');
-    showToast(error.message);
-    render();
-  }
-}
-
 async function submitProduct(event) {
   event.preventDefault();
   const form = new FormData(event.target);
@@ -523,6 +513,7 @@ async function submitProduct(event) {
     category: form.get('category'),
     price: Number(form.get('price')),
     description: form.get('description'),
+    image: form.get('image'),
     available: form.get('available') === 'on',
     highlight: form.get('highlight') === 'on'
   };
@@ -600,6 +591,14 @@ function formatDate(value) {
     hour: '2-digit',
     minute: '2-digit'
   }).format(new Date(value));
+}
+
+function paymentMethodLabel(method) {
+  return {
+    cash: 'Dinheiro',
+    credit: 'Credito',
+    debit: 'Debito'
+  }[method] || 'Dinheiro';
 }
 
 function escapeHtml(value) {

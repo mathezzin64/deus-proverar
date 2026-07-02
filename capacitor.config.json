@@ -1,0 +1,9 @@
+{
+  "appId": "com.deusproverar.app",
+  "appName": "DEUS PROVERAR",
+  "webDir": "public",
+  "server": {
+    "url": "https://deus-proverar.onrender.com",
+    "cleartext": false
+  }
+}

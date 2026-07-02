@@ -1,7 +1,7 @@
 :root {
-  --bg: #f6f2e8;
-  --surface: #fffaf0;
-  --surface-strong: #fff4dc;
+  --bg: #f4efe2;
+  --surface: #fffaf1;
+  --surface-strong: #fff1d1;
   --ink: #15211b;
   --muted: #657168;
   --line: #ded5c3;
@@ -20,7 +20,9 @@
 body {
   margin: 0;
   color: var(--ink);
-  background: var(--bg);
+  background:
+    radial-gradient(circle at top left, rgba(226, 169, 61, 0.26), transparent 34rem),
+    linear-gradient(180deg, #fff8eb 0%, var(--bg) 46%, #efe7d6 100%);
   font-family: Inter, Arial, sans-serif;
 }
 
@@ -49,7 +51,7 @@ button {
   gap: 16px;
   padding: 12px clamp(14px, 4vw, 34px);
   border-bottom: 1px solid var(--line);
-  background: rgba(246, 242, 232, 0.94);
+  background: rgba(255, 248, 235, 0.94);
   backdrop-filter: blur(14px);
 }
 
@@ -61,8 +63,9 @@ button {
 }
 
 .brand img {
-  width: 48px;
-  height: 48px;
+  width: 52px;
+  height: 52px;
+  filter: drop-shadow(0 8px 16px rgba(18, 48, 38, 0.2));
 }
 
 .brand strong,
@@ -107,7 +110,8 @@ button {
 .panel {
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: var(--surface);
+  overflow: hidden;
+  background: rgba(255, 250, 241, 0.96);
   box-shadow: var(--shadow);
 }
 
@@ -116,7 +120,7 @@ button {
   align-items: flex-start;
   justify-content: space-between;
   gap: 14px;
-  padding: 16px;
+  padding: 18px;
   border-bottom: 1px solid var(--line);
 }
 
@@ -126,7 +130,7 @@ button {
 }
 
 .panel-header h1 {
-  font-size: clamp(1.35rem, 3vw, 2rem);
+  font-size: clamp(1.55rem, 3vw, 2.25rem);
 }
 
 .panel-header h2 {
@@ -181,10 +185,25 @@ button {
 .product-card {
   display: grid;
   gap: 12px;
-  padding: 14px;
+  padding: 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #fffdf8;
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+.product-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 28px rgba(42, 35, 21, 0.11);
+}
+
+.product-image {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-strong);
 }
 
 .product-top {
@@ -194,8 +213,8 @@ button {
 }
 
 .product-card h3 {
-  margin: 0;
-  font-size: 1rem;
+  margin: 6px 0 0;
+  font-size: 1.08rem;
 }
 
 .product-card p {
@@ -209,6 +228,7 @@ button {
   color: var(--green);
   font-weight: 900;
   white-space: nowrap;
+  font-size: 1.03rem;
 }
 
 .tag {
@@ -251,7 +271,8 @@ button {
 
 .button {
   color: white;
-  background: linear-gradient(135deg, var(--green), var(--green-2));
+  background: linear-gradient(135deg, #0f4f37, var(--green-2));
+  box-shadow: 0 10px 22px rgba(23, 97, 68, 0.18);
 }
 
 .ghost-button {
@@ -349,6 +370,7 @@ button {
 
 .order-card {
   border-left: 5px solid var(--gold);
+  background: linear-gradient(180deg, #fffdf8, #fff8e9);
 }
 
 .order-card.paid {
@@ -361,6 +383,7 @@ button {
 
 .order-top strong {
   display: block;
+  font-size: 1.02rem;
 }
 
 .order-top small,
@@ -377,7 +400,7 @@ button {
 
 .status-controls {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
   gap: 8px;
 }
 

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 420">
+  <rect width="640" height="420" rx="28" fill="#e7f4fb"/>
+  <path d="M279 73h82v58c0 22 48 72 48 150 0 52-39 86-89 86s-89-34-89-86c0-78 48-128 48-150V73Z" fill="#7ec7e8"/>
+  <rect x="265" y="150" width="110" height="112" rx="18" fill="#fff" opacity=".82"/>
+  <path d="M286 291c24 19 70 18 92 0" stroke="#2a83aa" stroke-width="14" stroke-linecap="round"/>
+  <text x="253" y="220" fill="#1d5d7b" font-family="Arial" font-size="38" font-weight="900">AGUA</text>
+</svg>

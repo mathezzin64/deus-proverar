@@ -5,33 +5,54 @@ const cors = require('cors');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'DEUSPROVERAR2026';
 const dataDir = path.join(__dirname, 'data');
 const dataFile = path.join(dataDir, 'database.json');
 
+const defaultProducts = [
+  {
+    id: 'churrasco-completo',
+    name: 'CHURRASCO COMPLETO',
+    description: 'Churrasco mais refrigerante de 200 ml.',
+    price: 23,
+    category: 'Lanches',
+    image: '/img/churrasco-completo.svg',
+    available: true,
+    highlight: true
+  },
+  {
+    id: 'churrasco',
+    name: 'CHURRASCO',
+    description: 'Completo.',
+    price: 20,
+    category: 'Lanches',
+    image: '/img/churrasco.svg',
+    available: true,
+    highlight: true
+  },
+  {
+    id: 'agua',
+    name: 'Agua',
+    description: 'Agua mineral gelada.',
+    price: 3,
+    category: 'Bebidas',
+    image: '/img/agua.svg',
+    available: true,
+    highlight: false
+  },
+  {
+    id: 'salgado',
+    name: 'Salgado',
+    description: 'Salgado pronto para lanche.',
+    price: 8,
+    category: 'Salgados',
+    image: '/img/salgado.svg',
+    available: true,
+    highlight: false
+  }
+].map(product => ({ ...product, createdAt: new Date().toISOString() }));
+
 const initialData = {
-  products: [
-    {
-      id: 'lanche-001',
-      name: 'X-Salada',
-      description: 'Hamburguer, queijo, presunto, alface, tomate, milho e batata palha.',
-      price: 12,
-      category: 'Lanches',
-      available: true,
-      highlight: true,
-      createdAt: new Date().toISOString()
-    },
-    {
-      id: 'bebida-001',
-      name: 'Refrigerante lata',
-      description: 'Escolha o sabor na observacao do pedido.',
-      price: 5,
-      category: 'Bebidas',
-      available: true,
-      highlight: false,
-      createdAt: new Date().toISOString()
-    }
-  ],
+  products: defaultProducts,
   orders: []
 };
 
@@ -44,6 +65,19 @@ async function ensureDatabase() {
 
   try {
     await fs.access(dataFile);
+    const data = JSON.parse(await fs.readFile(dataFile, 'utf8'));
+    const hasOldSamples = data.products?.some(product => product.id === 'lanche-001' || product.id === 'bebida-001');
+    const hasDefaultProducts = defaultProducts.every(product => data.products?.some(saved => saved.id === product.id));
+
+    if (hasOldSamples || !hasDefaultProducts) {
+      const customProducts = (data.products || []).filter(product => {
+        const defaultId = defaultProducts.some(defaultProduct => defaultProduct.id === product.id);
+        const oldSample = product.id === 'lanche-001' || product.id === 'bebida-001';
+        return !defaultId && !oldSample;
+      });
+      data.products = [...defaultProducts, ...customProducts];
+      await writeData(data);
+    }
   } catch {
     await writeData(initialData);
   }
@@ -62,16 +96,6 @@ async function writeData(data) {
 
 function makeId(prefix) {
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
-}
-
-function requireAdmin(req, res, next) {
-  const password = req.header('x-admin-password');
-
-  if (password !== ADMIN_PASSWORD) {
-    return res.status(401).json({ error: 'Senha master invalida.' });
-  }
-
-  next();
 }
 
 function orderTotal(items, products) {
@@ -103,8 +127,8 @@ app.get('/api/summary', async (_req, res) => {
   });
 });
 
-app.post('/api/products', requireAdmin, async (req, res) => {
-  const { name, description, price, category, available = true, highlight = false } = req.body;
+app.post('/api/products', async (req, res) => {
+  const { name, description, price, category, image, available = true, highlight = false } = req.body;
 
   if (!name || !description || Number(price) <= 0) {
     return res.status(400).json({ error: 'Informe nome, descricao e valor valido.' });
@@ -117,6 +141,7 @@ app.post('/api/products', requireAdmin, async (req, res) => {
     description: String(description).trim(),
     price: Number(price),
     category: String(category || 'Lanches').trim(),
+    image: String(image || '').trim(),
     available: Boolean(available),
     highlight: Boolean(highlight),
     createdAt: new Date().toISOString()
@@ -127,7 +152,7 @@ app.post('/api/products', requireAdmin, async (req, res) => {
   res.status(201).json(product);
 });
 
-app.put('/api/products/:id', requireAdmin, async (req, res) => {
+app.put('/api/products/:id', async (req, res) => {
   const data = await readData();
   const index = data.products.findIndex(product => product.id === req.params.id);
 
@@ -137,10 +162,11 @@ app.put('/api/products/:id', requireAdmin, async (req, res) => {
 
   data.products[index] = {
     ...data.products[index],
-    name: String(req.body.name || data.products[index].name).trim(),
-    description: String(req.body.description || data.products[index].description).trim(),
-    price: Number(req.body.price || data.products[index].price),
-    category: String(req.body.category || data.products[index].category).trim(),
+    name: String(req.body.name ?? data.products[index].name).trim(),
+    description: String(req.body.description ?? data.products[index].description).trim(),
+    price: Number(req.body.price ?? data.products[index].price),
+    category: String(req.body.category ?? data.products[index].category).trim(),
+    image: String(req.body.image ?? data.products[index].image ?? '').trim(),
     available: Boolean(req.body.available),
     highlight: Boolean(req.body.highlight),
     updatedAt: new Date().toISOString()
@@ -150,7 +176,7 @@ app.put('/api/products/:id', requireAdmin, async (req, res) => {
   res.json(data.products[index]);
 });
 
-app.delete('/api/products/:id', requireAdmin, async (req, res) => {
+app.delete('/api/products/:id', async (req, res) => {
   const data = await readData();
   data.products = data.products.filter(product => product.id !== req.params.id);
   await writeData(data);
@@ -158,7 +184,7 @@ app.delete('/api/products/:id', requireAdmin, async (req, res) => {
 });
 
 app.post('/api/orders', async (req, res) => {
-  const { customerName, phone, address, notes, items } = req.body;
+  const { customerName, phone, address, notes, items, paymentMethod, paymentStatus } = req.body;
 
   if (!customerName || !phone || !address || !Array.isArray(items) || !items.length) {
     return res.status(400).json({ error: 'Informe cliente, telefone, endereco e produtos.' });
@@ -191,7 +217,8 @@ app.post('/api/orders', async (req, res) => {
     notes: String(notes || '').trim(),
     items: orderItems,
     total: orderTotal(orderItems, data.products),
-    paymentStatus: 'pending',
+    paymentMethod: ['credit', 'debit', 'cash'].includes(paymentMethod) ? paymentMethod : 'cash',
+    paymentStatus: paymentStatus === 'paid' ? 'paid' : 'pending',
     deliveryStatus: 'waiting',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
@@ -202,7 +229,7 @@ app.post('/api/orders', async (req, res) => {
   res.status(201).json(order);
 });
 
-app.patch('/api/orders/:id', requireAdmin, async (req, res) => {
+app.patch('/api/orders/:id', async (req, res) => {
   const data = await readData();
   const index = data.orders.findIndex(order => order.id === req.params.id);
 
@@ -217,6 +244,10 @@ app.patch('/api/orders/:id', requireAdmin, async (req, res) => {
     data.orders[index].paymentStatus = req.body.paymentStatus;
   }
 
+  if (['credit', 'debit', 'cash'].includes(req.body.paymentMethod)) {
+    data.orders[index].paymentMethod = req.body.paymentMethod;
+  }
+
   if (allowedDelivery.includes(req.body.deliveryStatus)) {
     data.orders[index].deliveryStatus = req.body.deliveryStatus;
   }
@@ -226,7 +257,7 @@ app.patch('/api/orders/:id', requireAdmin, async (req, res) => {
   res.json(data.orders[index]);
 });
 
-app.delete('/api/orders/:id', requireAdmin, async (req, res) => {
+app.delete('/api/orders/:id', async (req, res) => {
   const data = await readData();
   data.orders = data.orders.filter(order => order.id !== req.params.id);
   await writeData(data);
