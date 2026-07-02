@@ -197,6 +197,10 @@ button {
   box-shadow: 0 14px 28px rgba(42, 35, 21, 0.11);
 }
 
+.product-card.sold-out {
+  opacity: 0.72;
+}
+
 .product-image {
   width: 100%;
   aspect-ratio: 16 / 10;
@@ -340,6 +344,12 @@ button {
   cursor: pointer;
 }
 
+.quantity button:disabled {
+  color: var(--muted);
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 .quantity span {
   text-align: center;
   font-weight: 900;
@@ -366,6 +376,29 @@ button {
   padding: 14px 16px;
   border-top: 1px solid var(--line);
   font-weight: 900;
+}
+
+.change-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 46px;
+  padding: 0 12px;
+  border: 1px solid #d8c697;
+  border-radius: 8px;
+  color: #684808;
+  background: #fff2c6;
+  font-weight: 900;
+}
+
+.change-box span {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+}
+
+.change-box strong {
+  color: var(--green);
+  font-size: 1.12rem;
 }
 
 .order-card {

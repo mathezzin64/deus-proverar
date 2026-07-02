@@ -8,6 +8,7 @@ const state = {
     address: '',
     paymentMethod: 'cash',
     paymentStatus: 'pending',
+    cashReceived: '',
     notes: ''
   }),
   summary: null,
@@ -138,20 +139,24 @@ function catalogTemplate() {
 }
 
 function productCardTemplate(product) {
+  const stock = Number(product.stock || 0);
+  const canSell = product.available && stock > 0;
+
   return `
-    <article class="product-card">
+    <article class="product-card ${canSell ? '' : 'sold-out'}">
       <img class="product-image" src="${escapeHtml(product.image || '/logo.svg')}" alt="${escapeHtml(product.name)}" />
       <div class="product-top">
         <div>
           <span class="tag">${escapeHtml(product.category || 'Lanches')}</span>
           ${product.highlight ? `<span class="tag gold">Destaque</span>` : ''}
+          <span class="tag ${stock > 0 ? 'blue' : 'red'}">${stock > 0 ? `${stock} em estoque` : 'Esgotado'}</span>
           <h3>${escapeHtml(product.name)}</h3>
           <p>${escapeHtml(product.description)}</p>
         </div>
         <strong class="price">${money.format(product.price)}</strong>
       </div>
-      <button class="button" data-add-cart="${product.id}" ${product.available ? '' : 'disabled'} type="button">
-        ${product.available ? 'Adicionar ao pedido' : 'Indisponivel'}
+      <button class="button" data-add-cart="${product.id}" ${canSell ? '' : 'disabled'} type="button">
+        ${canSell ? 'Adicionar ao pedido' : 'Esgotado'}
       </button>
     </article>
   `;
@@ -160,6 +165,8 @@ function productCardTemplate(product) {
 function cartTemplate() {
   const items = cartItems();
   const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const cashReceived = Number(state.checkout.cashReceived || 0);
+  const changeDue = state.checkout.paymentMethod === 'cash' && cashReceived > 0 ? Math.max(0, cashReceived - total) : 0;
 
   return `
     <section class="panel">
@@ -187,6 +194,17 @@ function cartTemplate() {
         <select class="select" name="paymentMethod" required>
           ${['cash', 'pix', 'credit', 'debit'].map(method => `<option value="${method}" ${method === state.checkout.paymentMethod ? 'selected' : ''}>${paymentMethodLabel(method)}</option>`).join('')}
         </select>
+        ${
+          state.checkout.paymentMethod === 'cash'
+            ? `
+              <input class="input" name="cashReceived" data-checkout-field type="number" step="0.01" min="0" placeholder="Valor que a pessoa deu em dinheiro" value="${escapeHtml(state.checkout.cashReceived)}" />
+              <div class="change-box">
+                <span>Troco</span>
+                <strong data-change-due>${money.format(changeDue)}</strong>
+              </div>
+            `
+            : ''
+        }
         <select class="select" name="paymentStatus" required>
           <option value="pending" ${state.checkout.paymentStatus === 'pending' ? 'selected' : ''}>Vai pagar ainda</option>
           <option value="paid" ${state.checkout.paymentStatus === 'paid' ? 'selected' : ''}>Ja pagou</option>
@@ -203,12 +221,12 @@ function cartItemTemplate(item) {
     <article class="cart-row">
       <div>
         <strong>${escapeHtml(item.name)}</strong>
-        <small>${money.format(item.price)} cada</small>
+        <small>${money.format(item.price)} cada - ${item.stock} disponivel</small>
       </div>
       <div class="quantity">
         <button data-cart-dec="${item.productId}" type="button">-</button>
         <span>${item.quantity}</span>
-        <button data-cart-inc="${item.productId}" type="button">+</button>
+        <button data-cart-inc="${item.productId}" ${item.quantity >= item.stock ? 'disabled' : ''} type="button">+</button>
       </div>
     </article>
   `;
@@ -240,6 +258,7 @@ function orderTemplate(order) {
       ${order.items.map(item => `<li>${item.quantity}x ${escapeHtml(item.name)} - ${money.format(item.price * item.quantity)}</li>`).join('')}
     </ol>
     ${order.phone || order.address ? `<small>${order.phone ? `Telefone: ${escapeHtml(order.phone)}` : ''}${order.phone && order.address ? ' | ' : ''}${order.address ? `Entrega: ${escapeHtml(order.address)}` : ''}</small>` : ''}
+    ${order.paymentMethod === 'cash' ? `<small>Dinheiro recebido: ${money.format(order.cashReceived || 0)} | Troco: ${money.format(order.changeDue || 0)}</small>` : ''}
     ${order.notes ? `<small>${escapeHtml(order.notes)}</small>` : ''}
     <strong class="price">${money.format(order.total)}</strong>
   ` : '';
@@ -339,6 +358,7 @@ function adminTemplate() {
         <input class="input" name="name" placeholder="Nome do produto" value="${escapeHtml(editingProduct?.name || '')}" required />
         <input class="input" name="category" placeholder="Categoria" value="${escapeHtml(editingProduct?.category || 'Lanches')}" required />
         <input class="input" name="price" type="number" step="0.01" min="0" placeholder="Valor" value="${editingProduct?.price || ''}" required />
+        <input class="input" name="stock" type="number" step="1" min="0" placeholder="Quantidade em estoque" value="${editingProduct?.stock ?? ''}" required />
         <input class="input" name="image" placeholder="Imagem ou URL" value="${escapeHtml(editingProduct?.image || '')}" />
         <textarea class="textarea" name="description" placeholder="Descricao do produto" required>${escapeHtml(editingProduct?.description || '')}</textarea>
         <label><input name="available" type="checkbox" ${editingProduct?.available ?? true ? 'checked' : ''} /> Produto disponivel</label>
@@ -360,8 +380,9 @@ function adminProductTemplate(product) {
         <div>
           <strong>${escapeHtml(product.name)}</strong>
           <small>${escapeHtml(product.category)} - ${money.format(product.price)}</small>
+          <small>Estoque: ${Number(product.stock || 0)}</small>
         </div>
-        <span class="tag ${product.available ? '' : 'red'}">${product.available ? 'Ativo' : 'Pausado'}</span>
+        <span class="tag ${product.available && Number(product.stock || 0) > 0 ? '' : 'red'}">${product.available && Number(product.stock || 0) > 0 ? 'Ativo' : 'Esgotado'}</span>
       </div>
       <div class="nav-actions">
         <button class="ghost-button" data-edit-product="${product.id}" type="button">Editar</button>
@@ -460,15 +481,28 @@ function cartItems() {
     .map(item => {
       const product = state.products.find(candidate => candidate.id === item.productId);
       if (!product) return null;
-      return { ...item, name: product.name, price: Number(product.price) };
+      return { ...item, name: product.name, price: Number(product.price), stock: Number(product.stock || 0) };
     })
     .filter(Boolean);
 }
 
 function addToCart(productId) {
+  const product = state.products.find(candidate => candidate.id === productId);
+  const stock = Number(product?.stock || 0);
+
+  if (!product?.available || stock <= 0) {
+    showToast('Produto sem estoque no momento.');
+    return;
+  }
+
   const existing = state.cart.find(item => item.productId === productId);
 
   if (existing) {
+    if (existing.quantity >= stock) {
+      showToast(`So temos ${stock} unidade(s) em estoque.`);
+      return;
+    }
+
     existing.quantity += 1;
   } else {
     state.cart.push({ productId, quantity: 1 });
@@ -479,8 +513,17 @@ function addToCart(productId) {
 }
 
 function changeCartQuantity(productId, amount) {
+  const product = state.products.find(candidate => candidate.id === productId);
+  const stock = Number(product?.stock || 0);
+
   state.cart = state.cart
-    .map(item => item.productId === productId ? { ...item, quantity: item.quantity + amount } : item)
+    .map(item => {
+      if (item.productId !== productId) {
+        return item;
+      }
+
+      return { ...item, quantity: Math.min(stock, item.quantity + amount) };
+    })
     .filter(item => item.quantity > 0);
   saveCart();
 }
@@ -506,6 +549,7 @@ async function submitOrder(event) {
     notes: form.get('notes'),
     paymentMethod: form.get('paymentMethod'),
     paymentStatus: form.get('paymentStatus'),
+    cashReceived: form.get('cashReceived'),
     items: state.cart
   };
 
@@ -521,6 +565,7 @@ async function submitOrder(event) {
       address: '',
       paymentMethod: 'cash',
       paymentStatus: 'pending',
+      cashReceived: '',
       notes: ''
     };
     localStorage.removeItem('deus-proverar-checkout');
@@ -539,6 +584,20 @@ function updateCheckoutDraft(event) {
     [event.target.name]: event.target.value
   };
   localStorage.setItem('deus-proverar-checkout', JSON.stringify(state.checkout));
+
+  if (event.target.name === 'paymentMethod') {
+    render();
+  }
+
+  if (event.target.name === 'cashReceived') {
+    const total = cartItems().reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const changeDue = Math.max(0, Number(event.target.value || 0) - total);
+    const output = document.querySelector('[data-change-due]');
+
+    if (output) {
+      output.textContent = money.format(changeDue);
+    }
+  }
 }
 
 async function submitProduct(event) {
@@ -549,6 +608,7 @@ async function submitProduct(event) {
     name: form.get('name'),
     category: form.get('category'),
     price: Number(form.get('price')),
+    stock: Number(form.get('stock')),
     description: form.get('description'),
     image: form.get('image'),
     available: form.get('available') === 'on',
