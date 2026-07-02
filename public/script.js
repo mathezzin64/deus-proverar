@@ -310,7 +310,7 @@ function orderTemplate(order) {
       </div>
 
       <div class="order-actions">
-        <button class="button" data-deliver-order="${order.id}" type="button">Entregue</button>
+        <button class="button" data-deliver-order="${order.id}" data-payment-status="${order.paymentStatus}" type="button">Entregue</button>
         <button class="danger-button" data-delete-order="${order.id}" type="button">Excluir pedido</button>
       </div>
 
@@ -558,7 +558,7 @@ function bindEvents() {
   });
 
   document.querySelectorAll('[data-deliver-order]').forEach(button => {
-    button.addEventListener('click', () => markDelivered(button.dataset.deliverOrder));
+    button.addEventListener('click', () => markDelivered(button.dataset.deliverOrder, button.dataset.paymentStatus));
   });
 
   window.removeEventListener('touchstart', handlePullStart);
@@ -751,11 +751,24 @@ async function updateOrder(orderId, payload) {
   }
 }
 
-async function markDelivered(orderId) {
+async function markDelivered(orderId, paymentStatus) {
+  const payload = { deliveryStatus: 'delivered', receivedStatus: 'received' };
+
+  if (paymentStatus !== 'paid') {
+    const alreadyPaid = confirm('Esse pedido ainda esta com pagamento pendente. A pessoa ja pagou?');
+
+    if (!alreadyPaid) {
+      showToast('Pedido continua na fila aguardando pagamento.');
+      return;
+    }
+
+    payload.paymentStatus = 'paid';
+  }
+
   try {
     await api(`/api/orders/${orderId}`, {
       method: 'PATCH',
-      body: JSON.stringify({ deliveryStatus: 'delivered', receivedStatus: 'received' })
+      body: JSON.stringify(payload)
     });
     showToast('Pedido marcado como entregue.');
     await loadState();

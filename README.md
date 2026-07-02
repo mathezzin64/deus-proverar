@@ -47,6 +47,8 @@ MONGODB_URI=mongodb+srv://...
 MONGODB_DB=deus_proverar
 ```
 
+Com `MONGODB_URI` configurado no Render, todos os vendedores acessam o mesmo banco online. Assim pedidos, estoque, fila e painel aparecem iguais para todo mundo.
+
 Rodando localmente sem `MONGODB_URI`, o app usa fallback em:
 
 ```txt
