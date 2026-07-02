@@ -47,6 +47,17 @@ const defaultProducts = [
     highlight: false
   },
   {
+    id: 'refrigerante-200ml',
+    name: 'Refrigerante 200ml',
+    description: 'Refrigerante gelado de 200 ml.',
+    price: 3,
+    category: 'Bebidas',
+    image: 'https://images.unsplash.com/photo-1581636625402-29b2a704ef13?auto=format&fit=crop&w=900&q=80',
+    stock: 40,
+    available: true,
+    highlight: false
+  },
+  {
     id: 'salgado',
     name: 'Salgado',
     description: 'Salgado pronto para lanche.',
@@ -141,32 +152,31 @@ function migrateData(data) {
     orders: Array.isArray(data?.orders) ? data.orders : []
   };
 
-  const hasOldSamples = safeData.products.some(product => product.id === 'lanche-001' || product.id === 'bebida-001');
-  const hasDefaultProducts = defaultProducts.every(product => safeData.products.some(saved => saved.id === product.id));
+  const savedProducts = safeData.products.filter(product => product.id !== 'lanche-001' && product.id !== 'bebida-001');
+  const savedById = new Map(savedProducts.map(product => [product.id, product]));
+  const defaultIds = new Set(defaultProducts.map(product => product.id));
+  const mergedDefaults = defaultProducts.map(defaultProduct => {
+    const savedProduct = savedById.get(defaultProduct.id);
+    return normalizeProduct(savedProduct ? { ...defaultProduct, ...savedProduct } : defaultProduct, defaultProduct);
+  });
+  const customProducts = savedProducts
+    .filter(product => !defaultIds.has(product.id))
+    .map(product => normalizeProduct(product));
 
-  if (hasOldSamples || !hasDefaultProducts) {
-    const customProducts = safeData.products.filter(product => {
-      const defaultId = defaultProducts.some(defaultProduct => defaultProduct.id === product.id);
-      const oldSample = product.id === 'lanche-001' || product.id === 'bebida-001';
-      return !defaultId && !oldSample;
-    });
-    safeData.products = [...defaultProducts, ...customProducts];
-  } else {
-    safeData.products = safeData.products.map(product => {
-      const defaultProduct = defaultProducts.find(candidate => candidate.id === product.id);
-      return defaultProduct
-        ? {
-            ...product,
-            ...defaultProduct,
-            stock: Number.isFinite(Number(product.stock)) ? Number(product.stock) : defaultProduct.stock,
-            available: product.available ?? defaultProduct.available,
-            highlight: product.highlight ?? defaultProduct.highlight
-          }
-        : { ...product, stock: Number(product.stock || 0) };
-    });
-  }
+  safeData.products = [...mergedDefaults, ...customProducts];
 
   return safeData;
+}
+
+function normalizeProduct(product, fallback = {}) {
+  return {
+    ...fallback,
+    ...product,
+    stock: Number.isFinite(Number(product?.stock)) ? Math.max(0, Number(product.stock)) : Number(fallback.stock || 0),
+    price: Number.isFinite(Number(product?.price)) ? Number(product.price) : Number(fallback.price || 0),
+    available: product?.available ?? fallback.available ?? true,
+    highlight: product?.highlight ?? fallback.highlight ?? false
+  };
 }
 
 function makeId(prefix) {
