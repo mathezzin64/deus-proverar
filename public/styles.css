@@ -431,14 +431,15 @@ button {
   font-size: 0.86rem;
 }
 
+.order-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .status-controls {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
-}
-
-.status-controls .danger-button {
-  grid-column: 1 / -1;
 }
 
 .summary-grid {

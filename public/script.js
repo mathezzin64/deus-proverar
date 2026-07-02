@@ -281,6 +281,10 @@ function orderTemplate(order) {
         <span class="tag ${order.deliveryStatus === 'delivered' ? '' : 'blue'}">${statusLabels[order.deliveryStatus]}</span>
       </div>
 
+      <div class="order-actions">
+        <button class="danger-button" data-delete-order="${order.id}" type="button">Excluir pedido</button>
+      </div>
+
       ${state.adminOpen ? adminOrderControlsTemplate(order) : ''}
     </article>
   `;
@@ -301,7 +305,6 @@ function adminOrderControlsTemplate(order) {
       <select class="select" data-delivery="${order.id}">
         ${['waiting', 'preparing', 'out', 'delivered', 'cancelled'].map(status => `<option value="${status}" ${status === order.deliveryStatus ? 'selected' : ''}>${statusLabels[status]}</option>`).join('')}
       </select>
-      <button class="danger-button" data-delete-order="${order.id}" type="button">Remover pedido</button>
     </div>
   `;
 }
