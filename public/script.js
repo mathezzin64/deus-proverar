@@ -1,0 +1,613 @@
+const state = {
+  products: [],
+  orders: [],
+  cart: readJson('deus-proverar-cart', []),
+  summary: null,
+  category: 'Todos',
+  search: '',
+  adminPassword: sessionStorage.getItem('deus-proverar-admin') || '',
+  adminOpen: false,
+  productEditingId: null,
+  toast: ''
+};
+
+const money = new Intl.NumberFormat('pt-BR', {
+  style: 'currency',
+  currency: 'BRL'
+});
+
+const statusLabels = {
+  pending: 'Nao pago',
+  paid: 'Pago',
+  cancelled: 'Cancelado',
+  waiting: 'Na fila',
+  preparing: 'Preparando',
+  out: 'Saiu para entrega',
+  delivered: 'Entregue'
+};
+
+const app = document.querySelector('#app');
+
+init();
+
+async function init() {
+  render();
+  await loadState();
+  setInterval(loadState, 5000);
+}
+
+async function api(path, options = {}) {
+  const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
+
+  if (state.adminPassword) {
+    headers['x-admin-password'] = state.adminPassword;
+  }
+
+  const response = await fetch(path, { ...options, headers });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.error || 'Erro na solicitacao.');
+  }
+
+  if (response.status === 204) {
+    return null;
+  }
+
+  return response.json();
+}
+
+async function loadState() {
+  try {
+    const [data, summary] = await Promise.all([api('/api/state'), api('/api/summary')]);
+    state.products = data.products || [];
+    state.orders = data.orders || [];
+    state.summary = summary;
+    render();
+  } catch (error) {
+    showToast(error.message);
+  }
+}
+
+function render() {
+  app.innerHTML = `
+    <main class="shell">
+      <header class="topbar">
+        <div class="brand">
+          <img src="/logo.svg" alt="DEUS PROVERAR" />
+          <div>
+            <strong>DEUS PROVERAR</strong>
+            <span>Lanches online</span>
+          </div>
+        </div>
+        <div class="nav-actions">
+          <button class="ghost-button" data-scroll="orders" type="button">Fila de pedidos</button>
+          <button class="ghost-button" data-admin-toggle type="button">${state.adminOpen ? 'Fechar painel' : 'Painel master'}</button>
+        </div>
+      </header>
+
+      <section class="page">
+        <div class="main-column">
+          ${catalogTemplate()}
+          ${ordersTemplate()}
+          ${adminTemplate()}
+        </div>
+        <aside class="side-column">
+          ${cartTemplate()}
+          ${summaryTemplate()}
+        </aside>
+      </section>
+    </main>
+    ${state.toast ? `<div class="toast">${escapeHtml(state.toast)}</div>` : ''}
+  `;
+
+  bindEvents();
+}
+
+function catalogTemplate() {
+  const categories = ['Todos', ...new Set(state.products.map(product => product.category || 'Lanches'))];
+  const products = filteredProducts();
+
+  return `
+    <section class="panel">
+      <div class="panel-header">
+        <div>
+          <p class="eyebrow">Cardapio</p>
+          <h1>Lanches para pedir agora</h1>
+        </div>
+        <span class="tag gold">${products.length} itens</span>
+      </div>
+
+      <div class="catalog-tools">
+        <input class="input" data-search placeholder="Buscar lanche, bebida ou descricao" value="${escapeHtml(state.search)}" />
+        <select class="select" data-category>
+          ${categories.map(category => `<option ${category === state.category ? 'selected' : ''}>${escapeHtml(category)}</option>`).join('')}
+        </select>
+      </div>
+
+      <div class="product-grid">
+        ${products.map(productCardTemplate).join('') || `<p class="empty">Nenhum produto disponivel agora.</p>`}
+      </div>
+    </section>
+  `;
+}
+
+function productCardTemplate(product) {
+  return `
+    <article class="product-card">
+      <div class="product-top">
+        <div>
+          <span class="tag">${escapeHtml(product.category || 'Lanches')}</span>
+          ${product.highlight ? `<span class="tag gold">Destaque</span>` : ''}
+          <h3>${escapeHtml(product.name)}</h3>
+          <p>${escapeHtml(product.description)}</p>
+        </div>
+        <strong class="price">${money.format(product.price)}</strong>
+      </div>
+      <button class="button" data-add-cart="${product.id}" ${product.available ? '' : 'disabled'} type="button">
+        ${product.available ? 'Adicionar ao pedido' : 'Indisponivel'}
+      </button>
+    </article>
+  `;
+}
+
+function cartTemplate() {
+  const items = cartItems();
+  const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+
+  return `
+    <section class="panel">
+      <div class="panel-header">
+        <div>
+          <p class="eyebrow">Seu pedido</p>
+          <h2>Carrinho</h2>
+        </div>
+        <span class="tag">${items.length} itens</span>
+      </div>
+
+      <div class="cart-list">
+        ${items.map(cartItemTemplate).join('') || `<p class="cart-empty">Escolha os produtos para montar o pedido.</p>`}
+      </div>
+
+      <div class="total-line">
+        <span>Total</span>
+        <strong>${money.format(total)}</strong>
+      </div>
+
+      <form class="checkout-form" data-checkout>
+        <input class="input" name="customerName" placeholder="Seu nome" required />
+        <input class="input" name="phone" placeholder="WhatsApp" required />
+        <input class="input" name="address" placeholder="Endereco para entrega" required />
+        <textarea class="textarea" name="notes" placeholder="Observacoes: ponto da carne, troco, retirada..."></textarea>
+        <button class="button" ${items.length ? '' : 'disabled'} type="submit">Enviar pedido</button>
+      </form>
+    </section>
+  `;
+}
+
+function cartItemTemplate(item) {
+  return `
+    <article class="cart-row">
+      <div>
+        <strong>${escapeHtml(item.name)}</strong>
+        <small>${money.format(item.price)} cada</small>
+      </div>
+      <div class="quantity">
+        <button data-cart-dec="${item.productId}" type="button">-</button>
+        <span>${item.quantity}</span>
+        <button data-cart-inc="${item.productId}" type="button">+</button>
+      </div>
+    </article>
+  `;
+}
+
+function ordersTemplate() {
+  const orders = [...state.orders].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+
+  return `
+    <section class="panel" id="orders">
+      <div class="panel-header">
+        <div>
+          <p class="eyebrow">Fila publica</p>
+          <h2>Pedidos em ordem de chegada</h2>
+        </div>
+        <span class="tag gold">Atualiza sozinho</span>
+      </div>
+
+      <div class="order-list">
+        ${orders.map(orderTemplate).join('') || `<p class="empty">Nenhum pedido ainda. O primeiro pode ser o seu.</p>`}
+      </div>
+    </section>
+  `;
+}
+
+function orderTemplate(order) {
+  return `
+    <article class="order-card ${order.paymentStatus === 'paid' ? 'paid' : ''} ${order.deliveryStatus === 'cancelled' ? 'cancelled' : ''}">
+      <div class="order-top">
+        <div>
+          <strong>${escapeHtml(order.code)} - ${escapeHtml(order.customerName)}</strong>
+          <small>${formatDate(order.createdAt)} - ${escapeHtml(order.address)}</small>
+        </div>
+        <strong class="price">${money.format(order.total)}</strong>
+      </div>
+
+      <ol class="order-items">
+        ${order.items.map(item => `<li>${item.quantity}x ${escapeHtml(item.name)}</li>`).join('')}
+      </ol>
+
+      ${order.notes ? `<small>${escapeHtml(order.notes)}</small>` : ''}
+
+      <div class="order-statuses">
+        <span class="tag ${order.paymentStatus === 'paid' ? '' : 'gold'}">${statusLabels[order.paymentStatus]}</span>
+        <span class="tag ${order.deliveryStatus === 'delivered' ? '' : 'blue'}">${statusLabels[order.deliveryStatus]}</span>
+      </div>
+
+      ${state.adminOpen && state.adminPassword ? adminOrderControlsTemplate(order) : ''}
+    </article>
+  `;
+}
+
+function adminOrderControlsTemplate(order) {
+  return `
+    <div class="status-controls">
+      <select class="select" data-payment="${order.id}">
+        ${['pending', 'paid', 'cancelled'].map(status => `<option value="${status}" ${status === order.paymentStatus ? 'selected' : ''}>${statusLabels[status]}</option>`).join('')}
+      </select>
+      <select class="select" data-delivery="${order.id}">
+        ${['waiting', 'preparing', 'out', 'delivered', 'cancelled'].map(status => `<option value="${status}" ${status === order.deliveryStatus ? 'selected' : ''}>${statusLabels[status]}</option>`).join('')}
+      </select>
+      <button class="danger-button" data-delete-order="${order.id}" type="button">Remover pedido</button>
+    </div>
+  `;
+}
+
+function summaryTemplate() {
+  const summary = state.summary || {
+    totalSold: 0,
+    ordersCount: 0,
+    paidCount: 0,
+    pendingPaymentCount: 0,
+    deliveredCount: 0,
+    waitingDeliveryCount: 0
+  };
+
+  return `
+    <section class="panel">
+      <div class="panel-header">
+        <div>
+          <p class="eyebrow">Controle</p>
+          <h2>Resumo de vendas</h2>
+        </div>
+      </div>
+      <div class="summary-grid">
+        ${metricTemplate('Vendido', money.format(summary.totalSold))}
+        ${metricTemplate('Pedidos', summary.ordersCount)}
+        ${metricTemplate('Pagos', summary.paidCount)}
+        ${metricTemplate('A receber', summary.pendingPaymentCount)}
+        ${metricTemplate('Entregues', summary.deliveredCount)}
+        ${metricTemplate('Na entrega', summary.waitingDeliveryCount)}
+      </div>
+    </section>
+  `;
+}
+
+function metricTemplate(label, value) {
+  return `<article class="metric"><span>${label}</span><strong>${value}</strong></article>`;
+}
+
+function adminTemplate() {
+  const editingProduct = state.products.find(product => product.id === state.productEditingId);
+
+  return `
+    <section class="panel admin-shell ${state.adminOpen ? 'active' : ''}">
+      <div class="panel-header">
+        <div>
+          <p class="eyebrow">Master</p>
+          <h2>Painel de produtos e pedidos</h2>
+        </div>
+        ${state.adminPassword ? `<span class="tag">Liberado</span>` : `<span class="tag gold">Bloqueado</span>`}
+      </div>
+
+      ${
+        state.adminPassword
+          ? `
+            <form class="admin-form" data-product-form>
+              <input type="hidden" name="id" value="${editingProduct?.id || ''}" />
+              <input class="input" name="name" placeholder="Nome do produto" value="${escapeHtml(editingProduct?.name || '')}" required />
+              <input class="input" name="category" placeholder="Categoria" value="${escapeHtml(editingProduct?.category || 'Lanches')}" required />
+              <input class="input" name="price" type="number" step="0.01" min="0" placeholder="Valor" value="${editingProduct?.price || ''}" required />
+              <textarea class="textarea" name="description" placeholder="Descricao do produto" required>${escapeHtml(editingProduct?.description || '')}</textarea>
+              <label><input name="available" type="checkbox" ${editingProduct?.available ?? true ? 'checked' : ''} /> Produto disponivel</label>
+              <label><input name="highlight" type="checkbox" ${editingProduct?.highlight ? 'checked' : ''} /> Marcar como destaque</label>
+              <button class="button" type="submit">${editingProduct ? 'Salvar produto' : 'Adicionar produto'}</button>
+              ${editingProduct ? `<button class="ghost-button" data-cancel-edit type="button">Cancelar edicao</button>` : ''}
+            </form>
+            <div class="admin-list">
+              ${state.products.map(adminProductTemplate).join('')}
+            </div>
+          `
+          : `
+            <form class="admin-form" data-admin-login>
+              <input class="input" name="password" type="password" placeholder="Senha master" required />
+              <button class="button" type="submit">Entrar no painel</button>
+            </form>
+          `
+      }
+    </section>
+  `;
+}
+
+function adminProductTemplate(product) {
+  return `
+    <article class="admin-product">
+      <div class="product-top">
+        <div>
+          <strong>${escapeHtml(product.name)}</strong>
+          <small>${escapeHtml(product.category)} - ${money.format(product.price)}</small>
+        </div>
+        <span class="tag ${product.available ? '' : 'red'}">${product.available ? 'Ativo' : 'Pausado'}</span>
+      </div>
+      <div class="nav-actions">
+        <button class="ghost-button" data-edit-product="${product.id}" type="button">Editar</button>
+        <button class="danger-button" data-delete-product="${product.id}" type="button">Excluir</button>
+      </div>
+    </article>
+  `;
+}
+
+function bindEvents() {
+  document.querySelector('[data-search]')?.addEventListener('input', event => {
+    state.search = event.target.value;
+    render();
+  });
+
+  document.querySelector('[data-category]')?.addEventListener('change', event => {
+    state.category = event.target.value;
+    render();
+  });
+
+  document.querySelectorAll('[data-add-cart]').forEach(button => {
+    button.addEventListener('click', () => addToCart(button.dataset.addCart));
+  });
+
+  document.querySelectorAll('[data-cart-inc]').forEach(button => {
+    button.addEventListener('click', () => changeCartQuantity(button.dataset.cartInc, 1));
+  });
+
+  document.querySelectorAll('[data-cart-dec]').forEach(button => {
+    button.addEventListener('click', () => changeCartQuantity(button.dataset.cartDec, -1));
+  });
+
+  document.querySelector('[data-checkout]')?.addEventListener('submit', submitOrder);
+  document.querySelector('[data-admin-toggle]')?.addEventListener('click', () => {
+    state.adminOpen = !state.adminOpen;
+    render();
+  });
+
+  document.querySelector('[data-scroll="orders"]')?.addEventListener('click', () => {
+    document.querySelector('#orders')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+
+  document.querySelector('[data-admin-login]')?.addEventListener('submit', submitAdminLogin);
+  document.querySelector('[data-product-form]')?.addEventListener('submit', submitProduct);
+
+  document.querySelector('[data-cancel-edit]')?.addEventListener('click', () => {
+    state.productEditingId = null;
+    render();
+  });
+
+  document.querySelectorAll('[data-edit-product]').forEach(button => {
+    button.addEventListener('click', () => {
+      state.productEditingId = button.dataset.editProduct;
+      render();
+    });
+  });
+
+  document.querySelectorAll('[data-delete-product]').forEach(button => {
+    button.addEventListener('click', () => deleteProduct(button.dataset.deleteProduct));
+  });
+
+  document.querySelectorAll('[data-payment]').forEach(select => {
+    select.addEventListener('change', () => updateOrder(select.dataset.payment, { paymentStatus: select.value }));
+  });
+
+  document.querySelectorAll('[data-delivery]').forEach(select => {
+    select.addEventListener('change', () => updateOrder(select.dataset.delivery, { deliveryStatus: select.value }));
+  });
+
+  document.querySelectorAll('[data-delete-order]').forEach(button => {
+    button.addEventListener('click', () => deleteOrder(button.dataset.deleteOrder));
+  });
+}
+
+function filteredProducts() {
+  return state.products.filter(product => {
+    const matchesCategory = state.category === 'Todos' || product.category === state.category;
+    const haystack = `${product.name} ${product.description} ${product.category}`.toLowerCase();
+    return matchesCategory && haystack.includes(state.search.toLowerCase());
+  });
+}
+
+function cartItems() {
+  return state.cart
+    .map(item => {
+      const product = state.products.find(candidate => candidate.id === item.productId);
+      if (!product) return null;
+      return { ...item, name: product.name, price: Number(product.price) };
+    })
+    .filter(Boolean);
+}
+
+function addToCart(productId) {
+  const existing = state.cart.find(item => item.productId === productId);
+
+  if (existing) {
+    existing.quantity += 1;
+  } else {
+    state.cart.push({ productId, quantity: 1 });
+  }
+
+  saveCart();
+  showToast('Produto adicionado ao pedido.');
+}
+
+function changeCartQuantity(productId, amount) {
+  state.cart = state.cart
+    .map(item => item.productId === productId ? { ...item, quantity: item.quantity + amount } : item)
+    .filter(item => item.quantity > 0);
+  saveCart();
+}
+
+function saveCart() {
+  localStorage.setItem('deus-proverar-cart', JSON.stringify(state.cart));
+  render();
+}
+
+async function submitOrder(event) {
+  event.preventDefault();
+
+  if (!state.cart.length) {
+    showToast('Adicione pelo menos um produto.');
+    return;
+  }
+
+  const form = new FormData(event.target);
+  const payload = {
+    customerName: form.get('customerName'),
+    phone: form.get('phone'),
+    address: form.get('address'),
+    notes: form.get('notes'),
+    items: state.cart
+  };
+
+  try {
+    await api('/api/orders', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    state.cart = [];
+    saveCart();
+    event.target.reset();
+    showToast('Pedido enviado e entrou na fila.');
+    await loadState();
+  } catch (error) {
+    showToast(error.message);
+  }
+}
+
+async function submitAdminLogin(event) {
+  event.preventDefault();
+  const password = new FormData(event.target).get('password');
+  state.adminPassword = password;
+  sessionStorage.setItem('deus-proverar-admin', password);
+
+  try {
+    await api('/api/state');
+    showToast('Painel master liberado.');
+    render();
+  } catch (error) {
+    state.adminPassword = '';
+    sessionStorage.removeItem('deus-proverar-admin');
+    showToast(error.message);
+    render();
+  }
+}
+
+async function submitProduct(event) {
+  event.preventDefault();
+  const form = new FormData(event.target);
+  const id = form.get('id');
+  const payload = {
+    name: form.get('name'),
+    category: form.get('category'),
+    price: Number(form.get('price')),
+    description: form.get('description'),
+    available: form.get('available') === 'on',
+    highlight: form.get('highlight') === 'on'
+  };
+
+  try {
+    await api(id ? `/api/products/${id}` : '/api/products', {
+      method: id ? 'PUT' : 'POST',
+      body: JSON.stringify(payload)
+    });
+    state.productEditingId = null;
+    showToast(id ? 'Produto atualizado.' : 'Produto adicionado.');
+    await loadState();
+  } catch (error) {
+    showToast(error.message);
+  }
+}
+
+async function deleteProduct(productId) {
+  if (!confirm('Excluir este produto?')) return;
+
+  try {
+    await api(`/api/products/${productId}`, { method: 'DELETE' });
+    showToast('Produto excluido.');
+    await loadState();
+  } catch (error) {
+    showToast(error.message);
+  }
+}
+
+async function updateOrder(orderId, payload) {
+  try {
+    await api(`/api/orders/${orderId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload)
+    });
+    await loadState();
+  } catch (error) {
+    showToast(error.message);
+  }
+}
+
+async function deleteOrder(orderId) {
+  if (!confirm('Remover este pedido da fila?')) return;
+
+  try {
+    await api(`/api/orders/${orderId}`, { method: 'DELETE' });
+    showToast('Pedido removido.');
+    await loadState();
+  } catch (error) {
+    showToast(error.message);
+  }
+}
+
+function showToast(message) {
+  state.toast = message;
+  render();
+  setTimeout(() => {
+    state.toast = '';
+    render();
+  }, 2600);
+}
+
+function readJson(key, fallback) {
+  try {
+    return JSON.parse(localStorage.getItem(key)) || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function formatDate(value) {
+  return new Intl.DateTimeFormat('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  }).format(new Date(value));
+}
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, char => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  }[char]));
+}

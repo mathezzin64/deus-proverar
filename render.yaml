@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: deus-proverar
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 22.12.0
+      - key: ADMIN_PASSWORD
+        sync: false

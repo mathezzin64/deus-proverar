@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="DEUS PROVERAR">
+  <rect width="128" height="128" rx="26" fill="#123026"/>
+  <path d="M26 77c0-20 16-36 36-36h4c20 0 36 16 36 36v4H26v-4Z" fill="#f7c35f"/>
+  <path d="M30 80h68c5 0 9 4 9 9s-4 9-9 9H30c-5 0-9-4-9-9s4-9 9-9Z" fill="#fff7e8"/>
+  <path d="M36 63c7-9 18-15 30-15 11 0 21 5 28 13" fill="none" stroke="#123026" stroke-width="6" stroke-linecap="round"/>
+  <circle cx="48" cy="61" r="3" fill="#123026"/>
+  <circle cx="64" cy="57" r="3" fill="#123026"/>
+  <circle cx="80" cy="61" r="3" fill="#123026"/>
+  <path d="M40 31c8-10 21-15 34-12 10 2 18 8 23 16-9-5-21-4-30 2-10 7-20 8-27 5Z" fill="#4fb477"/>
+</svg>
