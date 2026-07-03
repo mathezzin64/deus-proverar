@@ -21,6 +21,8 @@ const state = {
   productEditingId: null,
   productDraft: readJson('deus-proverar-product-draft', {}),
   historyPeriod: null,
+  appVersion: null,
+  updatePending: false,
   toast: '',
   touchStartY: 0,
   refreshing: false
@@ -50,7 +52,9 @@ init();
 async function init() {
   render();
   await loadState({ forceRender: true });
+  await checkAppVersion({ initial: true });
   setInterval(() => loadState({ background: true }), 5000);
+  setInterval(checkAppVersion, 30000);
 }
 
 async function api(path, options = {}) {
@@ -84,6 +88,27 @@ async function loadState(options = {}) {
     if (!options.background) {
       showToast(error.message);
     }
+  }
+}
+
+async function checkAppVersion(options = {}) {
+  try {
+    const data = await api(`/api/version?t=${Date.now()}`);
+
+    if (options.initial || !state.appVersion) {
+      state.appVersion = data.version;
+      return;
+    }
+
+    if (data.version !== state.appVersion) {
+      state.updatePending = true;
+
+      if (!isUserEditing()) {
+        window.location.replace(`${window.location.pathname}?v=${Date.now()}`);
+      }
+    }
+  } catch {
+    // Version checks must never block orders or product edits.
   }
 }
 

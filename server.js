@@ -10,6 +10,7 @@ const dataDir = path.join(__dirname, 'data');
 const dataFile = path.join(dataDir, 'database.json');
 const mongoUri = process.env.MONGODB_URI;
 const mongoDbName = process.env.MONGODB_DB || 'deus_proverar';
+const appVersion = process.env.RENDER_GIT_COMMIT || process.env.APP_VERSION || new Date().toISOString();
 let mongoCollection = null;
 
 const defaultProducts = [
@@ -78,7 +79,7 @@ const initialData = {
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use((req, res, next) => {
-  const noCachePaths = ['/', '/index.html', '/script.js', '/styles.css'];
+  const noCachePaths = ['/', '/index.html', '/script.js', '/styles.css', '/api/version'];
 
   if (noCachePaths.includes(req.path)) {
     res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
@@ -89,6 +90,10 @@ app.use((req, res, next) => {
   next();
 });
 app.use(express.static(path.join(__dirname, 'public')));
+
+app.get('/api/version', (_req, res) => {
+  res.json({ version: appVersion });
+});
 
 async function getMongoCollection() {
   if (!mongoUri) {
