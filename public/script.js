@@ -200,8 +200,6 @@ function productCardTemplate(product) {
 function cartTemplate() {
   const items = cartItems();
   const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const cashReceived = Number(state.checkout.cashReceived || 0);
-  const changeDue = state.checkout.paymentMethod === 'cash' && cashReceived > 0 ? Math.max(0, cashReceived - total) : 0;
 
   return `
     <section class="panel">
@@ -224,27 +222,9 @@ function cartTemplate() {
 
       <form class="checkout-form" data-checkout>
         <input class="input" name="customerName" data-checkout-field placeholder="Seu nome" value="${escapeHtml(state.checkout.customerName)}" required />
-        <input class="input" name="phone" data-checkout-field placeholder="WhatsApp (opcional)" value="${escapeHtml(state.checkout.phone)}" />
-        <input class="input" name="address" data-checkout-field placeholder="Endereco para entrega (opcional)" value="${escapeHtml(state.checkout.address)}" />
         <select class="select" name="paymentMethod" required>
           ${['cash', 'pix', 'credit', 'debit'].map(method => `<option value="${method}" ${method === state.checkout.paymentMethod ? 'selected' : ''}>${paymentMethodLabel(method)}</option>`).join('')}
         </select>
-        ${
-          state.checkout.paymentMethod === 'cash'
-            ? `
-              <input class="input" name="cashReceived" data-checkout-field type="number" step="0.01" min="0" placeholder="Valor que a pessoa deu em dinheiro" value="${escapeHtml(state.checkout.cashReceived)}" />
-              <div class="change-box">
-                <span>Troco</span>
-                <strong data-change-due>${money.format(changeDue)}</strong>
-              </div>
-            `
-            : ''
-        }
-        <select class="select" name="paymentStatus" required>
-          <option value="pending" ${state.checkout.paymentStatus === 'pending' ? 'selected' : ''}>Vai pagar ainda</option>
-          <option value="paid" ${state.checkout.paymentStatus === 'paid' ? 'selected' : ''}>Ja pagou</option>
-        </select>
-        <textarea class="textarea" name="notes" data-checkout-field placeholder="Observacoes: ponto da carne, troco, retirada...">${escapeHtml(state.checkout.notes)}</textarea>
         <button class="button" ${items.length ? '' : 'disabled'} type="submit">Enviar pedido</button>
       </form>
     </section>
@@ -741,12 +721,12 @@ async function submitOrder(event) {
   const form = new FormData(event.target);
   const payload = {
     customerName: form.get('customerName'),
-    phone: form.get('phone'),
-    address: form.get('address'),
-    notes: form.get('notes'),
+    phone: '',
+    address: '',
+    notes: '',
     paymentMethod: form.get('paymentMethod'),
-    paymentStatus: form.get('paymentStatus'),
-    cashReceived: form.get('cashReceived'),
+    paymentStatus: 'pending',
+    cashReceived: '',
     items: state.cart
   };
 
