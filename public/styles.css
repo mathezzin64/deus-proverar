@@ -123,7 +123,7 @@ button {
   left: max(12px, env(safe-area-inset-left));
   z-index: 30;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 6px;
   width: min(680px, calc(100% - 24px));
   margin: 0 auto;
@@ -479,6 +479,36 @@ button {
   padding: 0 16px 16px;
 }
 
+.file-picker {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px dashed rgba(45, 212, 122, 0.38);
+  border-radius: 8px;
+  color: var(--green);
+  background: rgba(45, 212, 122, 0.08);
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.file-picker input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.image-preview {
+  width: 100%;
+  max-height: 220px;
+  object-fit: cover;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
 .total-line,
 .order-top,
 .order-statuses,
@@ -566,6 +596,30 @@ button {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
   padding: 14px;
+}
+
+.period-actions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  padding: 16px;
+}
+
+.period-actions button {
+  min-height: 54px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  color: var(--ink);
+  background: linear-gradient(180deg, #17241e, #101b16);
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.period-actions button.active {
+  color: #07110d;
+  border-color: transparent;
+  background: linear-gradient(135deg, var(--green), #9df2b6);
+  box-shadow: 0 10px 22px rgba(45, 212, 122, 0.18);
 }
 
 .metric {
@@ -787,7 +841,7 @@ button {
   }
 
   .app-menu {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 5px;
     width: calc(100% - 20px);
     padding: 6px;
@@ -806,7 +860,13 @@ button {
   }
 
   .app-menu span {
-    font-size: 0.64rem;
+    font-size: 0.56rem;
+  }
+
+  .period-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    padding: 10px;
   }
 
   .chart-card {

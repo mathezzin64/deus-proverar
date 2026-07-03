@@ -20,6 +20,7 @@ const state = {
   adminOpen: initialActiveTab === 'fila' || initialActiveTab === 'produtos',
   productEditingId: null,
   productDraft: readJson('deus-proverar-product-draft', {}),
+  historyPeriod: null,
   toast: '',
   touchStartY: 0,
   refreshing: false
@@ -105,6 +106,7 @@ function render() {
         ${tabButton('fila', 'Fila', iconSvg('queue'))}
         ${tabButton('produtos', 'Produtos', iconSvg('box'))}
         ${tabButton('painel', 'Painel', iconSvg('chart'))}
+        ${tabButton('historico', 'Historico', iconSvg('history'))}
       </nav>
 
       ${activePageTemplate()}
@@ -135,6 +137,10 @@ function activePageTemplate() {
 
   if (state.activeTab === 'painel') {
     return `<section class="page single-page"><div class="main-column">${summaryTemplate()}</div></section>`;
+  }
+
+  if (state.activeTab === 'historico') {
+    return `<section class="page single-page"><div class="main-column">${historyTemplate()}</div></section>`;
   }
 
   return `
@@ -423,6 +429,171 @@ function metricTemplate(label, value) {
   return `<article class="metric"><span>${label}</span><strong>${value}</strong></article>`;
 }
 
+function historyTemplate() {
+  const selected = state.historyPeriod;
+  const report = selected ? historyReport(selected) : null;
+
+  return `
+    <section class="panel">
+      <div class="panel-header">
+        <div>
+          <p class="eyebrow">Historico</p>
+          <h2>Vendas por periodo</h2>
+        </div>
+      </div>
+
+      <div class="period-actions">
+        ${periodButton('day', 'Diario')}
+        ${periodButton('week', 'Semana')}
+        ${periodButton('month', 'Mes')}
+        ${periodButton('year', 'Ano')}
+      </div>
+    </section>
+
+    ${
+      report
+        ? `
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">${report.label}</p>
+                <h2>${report.title}</h2>
+              </div>
+              <button class="button" data-report-pdf type="button">Gerar PDF</button>
+            </div>
+            <div class="summary-grid">
+              ${metricTemplate('Vendido', money.format(report.total))}
+              ${metricTemplate('Vendas', report.count)}
+              ${metricTemplate('Media', money.format(report.average))}
+              ${metricTemplate('Itens', report.items)}
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Recebimentos</p>
+                <h2>Forma de pagamento</h2>
+              </div>
+            </div>
+            <div class="summary-grid">
+              ${metricTemplate('Dinheiro', money.format(report.byPaymentMethod.cash))}
+              ${metricTemplate('PIX', money.format(report.byPaymentMethod.pix))}
+              ${metricTemplate('Credito', money.format(report.byPaymentMethod.credit))}
+              ${metricTemplate('Debito', money.format(report.byPaymentMethod.debit))}
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Detalhes</p>
+                <h2>Vendas do periodo</h2>
+              </div>
+              <span class="tag">${report.orders.length} vendas</span>
+            </div>
+            <div class="sale-list">
+              ${report.orders.map(saleTemplate).join('') || `<p class="empty">Nenhuma venda paga nesse periodo.</p>`}
+            </div>
+          </section>
+        `
+        : ''
+    }
+  `;
+}
+
+function periodButton(period, label) {
+  return `<button class="${state.historyPeriod === period ? 'active' : ''}" data-history-period="${period}" type="button">${label}</button>`;
+}
+
+function historyReport(period) {
+  const now = new Date();
+  const { start, end, label } = periodRange(period, now);
+  const orders = state.orders
+    .filter(order => order.paymentStatus === 'paid')
+    .filter(order => {
+      const date = new Date(order.createdAt);
+      return date >= start && date <= end;
+    })
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  const total = orders.reduce((sum, order) => sum + Number(order.total || 0), 0);
+  const items = orders.reduce((sum, order) => sum + (order.items || []).reduce((itemSum, item) => itemSum + Number(item.quantity || 0), 0), 0);
+  const byPaymentMethod = {
+    cash: orders.filter(order => order.paymentMethod === 'cash').reduce((sum, order) => sum + Number(order.total || 0), 0),
+    pix: orders.filter(order => order.paymentMethod === 'pix').reduce((sum, order) => sum + Number(order.total || 0), 0),
+    credit: orders.filter(order => order.paymentMethod === 'credit').reduce((sum, order) => sum + Number(order.total || 0), 0),
+    debit: orders.filter(order => order.paymentMethod === 'debit').reduce((sum, order) => sum + Number(order.total || 0), 0)
+  };
+
+  return {
+    label,
+    title: periodTitle(period, now),
+    orders,
+    total,
+    items,
+    count: orders.length,
+    average: orders.length ? total / orders.length : 0,
+    byPaymentMethod
+  };
+}
+
+function periodRange(period, baseDate) {
+  const start = new Date(baseDate);
+  const end = new Date(baseDate);
+
+  start.setHours(0, 0, 0, 0);
+  end.setHours(23, 59, 59, 999);
+
+  if (period === 'week') {
+    const day = start.getDay();
+    const diff = day === 0 ? 6 : day - 1;
+    start.setDate(start.getDate() - diff);
+    end.setTime(start.getTime());
+    end.setDate(start.getDate() + 6);
+    end.setHours(23, 59, 59, 999);
+  }
+
+  if (period === 'month') {
+    start.setDate(1);
+    end.setMonth(start.getMonth() + 1, 0);
+    end.setHours(23, 59, 59, 999);
+  }
+
+  if (period === 'year') {
+    start.setMonth(0, 1);
+    end.setMonth(11, 31);
+    end.setHours(23, 59, 59, 999);
+  }
+
+  return { start, end, label: periodLabel(period) };
+}
+
+function periodLabel(period) {
+  return {
+    day: 'Diario',
+    week: 'Semanal',
+    month: 'Mensal',
+    year: 'Anual'
+  }[period] || 'Periodo';
+}
+
+function periodTitle(period, date) {
+  if (period === 'day') {
+    return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(date);
+  }
+
+  if (period === 'week') {
+    const { start, end } = periodRange(period, date);
+    return `${formatShortDate(start)} ate ${formatShortDate(end)}`;
+  }
+
+  if (period === 'month') {
+    return new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(date);
+  }
+
+  return new Intl.DateTimeFormat('pt-BR', { year: 'numeric' }).format(date);
+}
+
 function donutTemplate(title, subtitle, slices, center) {
   return `
     <article class="chart-card">
@@ -506,6 +677,11 @@ function adminTemplate() {
         <input class="input" name="price" data-product-field type="number" step="0.01" min="0" placeholder="Valor" value="${escapeHtml(productForm.price)}" required />
         <input class="input" name="stock" data-product-field type="number" step="1" min="0" placeholder="Quantidade em estoque" value="${escapeHtml(productForm.stock)}" required />
         <input class="input" name="image" data-product-field placeholder="Imagem ou URL" value="${escapeHtml(productForm.image)}" />
+        <label class="file-picker">
+          <input name="imageFile" data-product-image-file type="file" accept="image/*" />
+          <span>Escolher foto do aparelho</span>
+        </label>
+        ${productForm.image ? `<img class="image-preview" src="${escapeHtml(productForm.image)}" alt="Foto do produto" />` : ''}
         <textarea class="textarea" name="description" data-product-field placeholder="Descricao do produto" required>${escapeHtml(productForm.description)}</textarea>
         <label><input name="available" data-product-field type="checkbox" ${productForm.available ? 'checked' : ''} /> Produto disponivel</label>
         <label><input name="highlight" data-product-field type="checkbox" ${productForm.highlight ? 'checked' : ''} /> Marcar como destaque</label>
@@ -570,6 +746,7 @@ function bindEvents() {
     button.addEventListener('click', () => {
       state.activeTab = button.dataset.tab;
       state.adminOpen = button.dataset.tab === 'produtos' || button.dataset.tab === 'fila';
+      state.historyPeriod = button.dataset.tab === 'historico' ? state.historyPeriod : null;
       localStorage.setItem('deus-proverar-tab', state.activeTab);
       render();
     });
@@ -592,6 +769,18 @@ function bindEvents() {
   document.querySelectorAll('[data-product-field]').forEach(field => {
     field.addEventListener('input', updateProductDraft);
     field.addEventListener('change', updateProductDraft);
+  });
+  document.querySelector('[data-product-image-file]')?.addEventListener('change', updateProductImageFromFile);
+
+  document.querySelectorAll('[data-history-period]').forEach(button => {
+    button.addEventListener('click', () => {
+      state.historyPeriod = button.dataset.historyPeriod;
+      render();
+    });
+  });
+
+  document.querySelector('[data-report-pdf]')?.addEventListener('click', () => {
+    generateHistoryReport(state.historyPeriod);
   });
 
   document.querySelector('[data-cancel-edit]')?.addEventListener('click', () => {
@@ -877,6 +1066,63 @@ function showToast(message) {
   }, 2600);
 }
 
+async function updateProductImageFromFile(event) {
+  const file = event.target.files?.[0];
+
+  if (!file) {
+    return;
+  }
+
+  if (!file.type.startsWith('image/')) {
+    showToast('Escolha um arquivo de imagem.');
+    return;
+  }
+
+  try {
+    const image = await resizeImage(file);
+    const form = event.target.closest('[data-product-form]');
+    const imageInput = form?.querySelector('input[name="image"]');
+
+    if (imageInput) {
+      imageInput.value = image;
+    }
+
+    updateProductDraft({ target: imageInput || event.target });
+    showToast('Foto carregada.');
+    render();
+  } catch {
+    showToast('Nao foi possivel carregar a foto.');
+  }
+}
+
+function resizeImage(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      const image = new Image();
+
+      image.onload = () => {
+        const maxSize = 900;
+        const scale = Math.min(1, maxSize / Math.max(image.width, image.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(image.width * scale));
+        canvas.height = Math.max(1, Math.round(image.height * scale));
+
+        const context = canvas.getContext('2d');
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', 0.82));
+      };
+
+      image.onerror = reject;
+      image.src = reader.result;
+    };
+
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 function updateProductDraft(event) {
   const form = event.target.closest('[data-product-form]');
 
@@ -920,6 +1166,79 @@ function saveProductDraft() {
 function clearProductDraft() {
   state.productDraft = {};
   localStorage.removeItem('deus-proverar-product-draft');
+}
+
+function generateHistoryReport(period) {
+  const report = historyReport(period);
+  const rows = report.orders.map(order => `
+    <tr>
+      <td>${escapeHtml(formatDate(order.createdAt))}</td>
+      <td>${escapeHtml(order.customerName)}</td>
+      <td>${escapeHtml(paymentMethodLabel(order.paymentMethod))}</td>
+      <td>${money.format(order.total)}</td>
+    </tr>
+  `).join('');
+  const reportWindow = window.open('', '_blank');
+
+  if (!reportWindow) {
+    showToast('Permita pop-up para gerar o PDF.');
+    return;
+  }
+
+  reportWindow.document.write(`
+    <!doctype html>
+    <html lang="pt-BR">
+      <head>
+        <meta charset="UTF-8" />
+        <title>Relatorio DEUS PROVERAR</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 28px; color: #17221b; }
+          h1, h2, p { margin: 0; }
+          header { display: flex; justify-content: space-between; gap: 20px; border-bottom: 2px solid #17221b; padding-bottom: 14px; margin-bottom: 18px; }
+          .brand { font-size: 22px; font-weight: 900; }
+          .muted { color: #64736a; font-size: 13px; margin-top: 4px; }
+          .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 18px 0; }
+          .card { border: 1px solid #ccd8d0; border-radius: 8px; padding: 12px; }
+          .card span { display: block; color: #64736a; font-size: 11px; font-weight: 900; text-transform: uppercase; }
+          .card strong { display: block; margin-top: 5px; font-size: 18px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 14px; }
+          th, td { border-bottom: 1px solid #dbe4df; padding: 9px; text-align: left; font-size: 13px; }
+          th { background: #edf5f0; font-size: 11px; text-transform: uppercase; }
+          @media print { button { display: none; } body { margin: 18px; } }
+        </style>
+      </head>
+      <body>
+        <header>
+          <div>
+            <div class="brand">DEUS PROVERAR</div>
+            <p class="muted">Relatorio ${escapeHtml(report.label)} - ${escapeHtml(report.title)}</p>
+          </div>
+          <button onclick="window.print()">Salvar em PDF</button>
+        </header>
+        <section class="grid">
+          <div class="card"><span>Vendido</span><strong>${money.format(report.total)}</strong></div>
+          <div class="card"><span>Vendas</span><strong>${report.count}</strong></div>
+          <div class="card"><span>Media</span><strong>${money.format(report.average)}</strong></div>
+          <div class="card"><span>Itens</span><strong>${report.items}</strong></div>
+        </section>
+        <section class="grid">
+          <div class="card"><span>Dinheiro</span><strong>${money.format(report.byPaymentMethod.cash)}</strong></div>
+          <div class="card"><span>PIX</span><strong>${money.format(report.byPaymentMethod.pix)}</strong></div>
+          <div class="card"><span>Credito</span><strong>${money.format(report.byPaymentMethod.credit)}</strong></div>
+          <div class="card"><span>Debito</span><strong>${money.format(report.byPaymentMethod.debit)}</strong></div>
+        </section>
+        <h2>Vendas</h2>
+        <table>
+          <thead>
+            <tr><th>Data</th><th>Cliente</th><th>Pagamento</th><th>Total</th></tr>
+          </thead>
+          <tbody>${rows || '<tr><td colspan="4">Nenhuma venda paga nesse periodo.</td></tr>'}</tbody>
+        </table>
+        <script>setTimeout(() => window.print(), 400);</script>
+      </body>
+    </html>
+  `);
+  reportWindow.document.close();
 }
 
 function handlePullStart(event) {
@@ -972,6 +1291,13 @@ function formatDate(value) {
   }).format(new Date(value));
 }
 
+function formatShortDate(value) {
+  return new Intl.DateTimeFormat('pt-BR', {
+    day: '2-digit',
+    month: '2-digit'
+  }).format(new Date(value));
+}
+
 function paymentMethodLabel(method) {
   return {
     cash: 'Dinheiro',
@@ -986,7 +1312,8 @@ function iconSvg(name) {
     home: '<path d="M3 10.8 12 3l9 7.8"/><path d="M5 9.5V21h5v-6h4v6h5V9.5"/>',
     queue: '<path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/>',
     box: '<path d="m21 8-9-5-9 5 9 5 9-5Z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/>',
-    chart: '<path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 16v-5"/><path d="M12 16V8"/><path d="M16 16v-7"/>'
+    chart: '<path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 16v-5"/><path d="M12 16V8"/><path d="M16 16v-7"/>',
+    history: '<path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 7v5l3 2"/>'
   };
 
   return `<svg viewBox="0 0 24 24" aria-hidden="true">${icons[name] || icons.home}</svg>`;
