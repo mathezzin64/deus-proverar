@@ -77,6 +77,17 @@ const initialData = {
 
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
+app.use((req, res, next) => {
+  const noCachePaths = ['/', '/index.html', '/script.js', '/styles.css'];
+
+  if (noCachePaths.includes(req.path)) {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+  }
+
+  next();
+});
 app.use(express.static(path.join(__dirname, 'public')));
 
 async function getMongoCollection() {
