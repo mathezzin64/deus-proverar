@@ -1,16 +1,17 @@
 :root {
-  --bg: #f4efe2;
-  --surface: #fffaf1;
-  --surface-strong: #fff1d1;
-  --ink: #15211b;
-  --muted: #657168;
-  --line: #ded5c3;
-  --green: #176144;
-  --green-2: #2f8a61;
-  --gold: #e2a93d;
-  --red: #b94134;
-  --blue: #285d7f;
-  --shadow: 0 18px 44px rgba(42, 35, 21, 0.12);
+  --bg: #eef3f0;
+  --surface: #ffffff;
+  --surface-strong: #f6faf7;
+  --ink: #13221b;
+  --muted: #66756d;
+  --line: #dae4de;
+  --green: #13583d;
+  --green-2: #24855c;
+  --gold: #d9a441;
+  --red: #b33b31;
+  --blue: #2b6d8f;
+  --shadow: 0 16px 36px rgba(19, 34, 27, 0.1);
+  --soft-shadow: 0 8px 20px rgba(19, 34, 27, 0.07);
 }
 
 * {
@@ -21,8 +22,8 @@ body {
   margin: 0;
   color: var(--ink);
   background:
-    radial-gradient(circle at top left, rgba(226, 169, 61, 0.26), transparent 34rem),
-    linear-gradient(180deg, #fff8eb 0%, var(--bg) 46%, #efe7d6 100%);
+    radial-gradient(circle at top left, rgba(36, 133, 92, 0.14), transparent 30rem),
+    linear-gradient(180deg, #fbfdfc 0%, var(--bg) 54%, #e7eee9 100%);
   font-family: Inter, Arial, sans-serif;
 }
 
@@ -70,9 +71,10 @@ button {
   justify-content: space-between;
   gap: 16px;
   padding: 12px clamp(14px, 4vw, 34px);
-  border-bottom: 1px solid rgba(222, 213, 195, 0.78);
-  background: rgba(255, 248, 235, 0.94);
-  backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(218, 228, 222, 0.86);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 10px 24px rgba(19, 34, 27, 0.06);
+  backdrop-filter: blur(16px);
 }
 
 .brand {
@@ -85,7 +87,7 @@ button {
 .brand img {
   width: 52px;
   height: 52px;
-  filter: drop-shadow(0 8px 16px rgba(18, 48, 38, 0.2));
+  filter: drop-shadow(0 8px 16px rgba(18, 48, 38, 0.14));
 }
 
 .brand strong,
@@ -121,8 +123,9 @@ button {
   padding: 6px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: rgba(255, 250, 241, 0.96);
-  box-shadow: 0 10px 24px rgba(42, 35, 21, 0.08);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: var(--soft-shadow);
+  backdrop-filter: blur(12px);
 }
 
 .app-menu button {
@@ -137,7 +140,7 @@ button {
 .app-menu button.active {
   color: #fff;
   background: linear-gradient(135deg, #0f4f37, var(--green-2));
-  box-shadow: 0 10px 18px rgba(23, 97, 68, 0.16);
+  box-shadow: 0 10px 18px rgba(23, 97, 68, 0.18);
 }
 
 .page {
@@ -150,7 +153,7 @@ button {
 
 .single-page {
   grid-template-columns: minmax(0, 1fr);
-  max-width: 960px;
+  max-width: 1080px;
 }
 
 .main-column,
@@ -164,7 +167,7 @@ button {
   border: 1px solid var(--line);
   border-radius: 8px;
   overflow: hidden;
-  background: rgba(255, 250, 241, 0.96);
+  background: rgba(255, 255, 255, 0.96);
   box-shadow: var(--shadow);
 }
 
@@ -175,6 +178,7 @@ button {
   gap: 14px;
   padding: 18px;
   border-bottom: 1px solid var(--line);
+  background: linear-gradient(180deg, #ffffff, #f9fbfa);
 }
 
 .panel-header h1,
@@ -213,7 +217,16 @@ button {
   border-radius: 8px;
   outline: none;
   color: var(--ink);
-  background: #fffdf8;
+  background: #fbfdfc;
+  transition: border-color 150ms ease, box-shadow 150ms ease, background 150ms ease;
+}
+
+.input:focus,
+.select:focus,
+.textarea:focus {
+  border-color: rgba(36, 133, 92, 0.72);
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(36, 133, 92, 0.12);
 }
 
 .input,
@@ -241,13 +254,13 @@ button {
   padding: 9px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #fffdf8;
+  background: #ffffff;
   transition: transform 160ms ease, box-shadow 160ms ease;
 }
 
 .product-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 14px 28px rgba(42, 35, 21, 0.11);
+  box-shadow: 0 14px 28px rgba(19, 34, 27, 0.11);
 }
 
 .product-card.sold-out {
@@ -261,6 +274,7 @@ button {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--surface-strong);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.42);
 }
 
 .product-top {
@@ -338,7 +352,7 @@ button {
 .ghost-button {
   color: var(--green);
   border: 1px solid var(--line);
-  background: #fffdf8;
+  background: #ffffff;
 }
 
 .danger-button {
@@ -378,7 +392,8 @@ button {
   padding: 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #fffdf8;
+  background: #ffffff;
+  box-shadow: 0 5px 14px rgba(19, 34, 27, 0.04);
 }
 
 .cart-row {
@@ -412,7 +427,7 @@ button {
 .quantity button {
   height: 32px;
   color: var(--green);
-  background: var(--surface-strong);
+  background: #edf6f1;
   cursor: pointer;
 }
 
@@ -459,7 +474,7 @@ button {
   border: 1px solid #d8c697;
   border-radius: 8px;
   color: #684808;
-  background: #fff2c6;
+  background: #fff5d8;
   font-weight: 900;
 }
 
@@ -475,7 +490,7 @@ button {
 
 .order-card {
   border-left: 5px solid var(--gold);
-  background: linear-gradient(180deg, #fffdf8, #fff8e9);
+  background: linear-gradient(180deg, #ffffff, #fbfdfc);
 }
 
 .order-card.paid {
@@ -518,15 +533,18 @@ button {
 
 .summary-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  padding: 16px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  padding: 14px;
 }
 
 .metric {
-  padding: 12px;
+  min-width: 0;
+  padding: 11px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #fffdf8;
+  background: linear-gradient(180deg, #ffffff, #f7faf8);
+  box-shadow: 0 5px 14px rgba(19, 34, 27, 0.04);
 }
 
 .metric span {
@@ -539,7 +557,8 @@ button {
 .metric strong {
   display: block;
   margin-top: 6px;
-  font-size: 1.3rem;
+  overflow-wrap: anywhere;
+  font-size: 1.12rem;
 }
 
 .admin-shell {
@@ -588,7 +607,7 @@ button {
   padding: 12px 14px;
   border-radius: 8px;
   color: white;
-  background: var(--green);
+  background: #123f2e;
   box-shadow: var(--shadow);
 }
 
@@ -617,9 +636,26 @@ button {
   }
 
   .catalog-tools,
-  .status-controls,
-  .summary-grid {
+  .status-controls {
     grid-template-columns: 1fr;
+  }
+
+  .summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .metric {
+    padding: 9px;
+  }
+
+  .metric span {
+    font-size: 0.62rem;
+  }
+
+  .metric strong {
+    font-size: 0.94rem;
   }
 
   .sale-card {
