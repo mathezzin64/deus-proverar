@@ -101,10 +101,10 @@ function render() {
       </header>
 
       <nav class="app-menu" aria-label="Menu principal">
-        ${tabButton('inicio', 'Inicio')}
-        ${tabButton('fila', 'Fila')}
-        ${tabButton('produtos', 'Produtos')}
-        ${tabButton('painel', 'Painel')}
+        ${tabButton('inicio', 'Inicio', iconSvg('home'))}
+        ${tabButton('fila', 'Fila', iconSvg('queue'))}
+        ${tabButton('produtos', 'Produtos', iconSvg('box'))}
+        ${tabButton('painel', 'Painel', iconSvg('chart'))}
       </nav>
 
       ${activePageTemplate()}
@@ -115,8 +115,13 @@ function render() {
   bindEvents();
 }
 
-function tabButton(tab, label) {
-  return `<button class="${state.activeTab === tab ? 'active' : ''}" data-tab="${tab}" type="button">${label}</button>`;
+function tabButton(tab, label, icon) {
+  return `
+    <button class="${state.activeTab === tab ? 'active' : ''}" data-tab="${tab}" type="button" aria-label="${label}">
+      ${icon}
+      <span>${label}</span>
+    </button>
+  `;
 }
 
 function activePageTemplate() {
@@ -357,6 +362,15 @@ function summaryTemplate() {
   const sales = [...state.orders]
     .filter(order => order.paymentStatus === 'paid' || order.deliveryStatus === 'delivered')
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  const paidPercent = percentage(summary.paidCount, summary.ordersCount);
+  const deliveredPercent = percentage(summary.deliveredCount, summary.ordersCount);
+  const paymentTotal = Object.values(summary.byPaymentMethod || {}).reduce((sum, value) => sum + Number(value || 0), 0);
+  const paymentSlices = [
+    { label: 'Dinheiro', value: Number(summary.byPaymentMethod?.cash || 0), color: '#2dd47a' },
+    { label: 'PIX', value: Number(summary.byPaymentMethod?.pix || 0), color: '#f3c74f' },
+    { label: 'Credito', value: Number(summary.byPaymentMethod?.credit || 0), color: '#56b6ff' },
+    { label: 'Debito', value: Number(summary.byPaymentMethod?.debit || 0), color: '#ff7a68' }
+  ];
 
   return `
     <section class="panel">
@@ -374,6 +388,12 @@ function summaryTemplate() {
         ${metricTemplate('Entregues', summary.deliveredCount)}
         ${metricTemplate('Na entrega', summary.waitingDeliveryCount)}
       </div>
+    </section>
+
+    <section class="chart-grid">
+      ${donutTemplate('Pagamentos', paymentTotal ? 'Por forma' : 'Sem vendas', paymentTotal ? paymentSlices : [{ label: 'Sem vendas', value: 1, color: '#334139' }], paymentTotal ? money.format(paymentTotal) : 'R$ 0,00')}
+      ${ringTemplate('Pedidos pagos', paidPercent, `${summary.paidCount}/${summary.ordersCount || 0}`, '#2dd47a')}
+      ${ringTemplate('Pedidos entregues', deliveredPercent, `${summary.deliveredCount}/${summary.ordersCount || 0}`, '#f3c74f')}
     </section>
 
     <section class="panel">
@@ -421,6 +441,56 @@ function saleTemplate(order) {
 
 function metricTemplate(label, value) {
   return `<article class="metric"><span>${label}</span><strong>${value}</strong></article>`;
+}
+
+function donutTemplate(title, subtitle, slices, center) {
+  return `
+    <article class="chart-card">
+      <div class="chart-copy">
+        <span>${title}</span>
+        <strong>${subtitle}</strong>
+      </div>
+      <div class="donut" style="--chart:${donutGradient(slices)}">
+        <div>${center}</div>
+      </div>
+      <div class="chart-legend">
+        ${slices.map(slice => `<span><i style="background:${slice.color}"></i>${slice.label}</span>`).join('')}
+      </div>
+    </article>
+  `;
+}
+
+function ringTemplate(title, percent, value, color) {
+  return `
+    <article class="chart-card compact-chart">
+      <div class="chart-copy">
+        <span>${title}</span>
+        <strong>${value}</strong>
+      </div>
+      <div class="donut ring" style="--chart: ${color} ${percent}%, #2a352f 0">
+        <div>${percent}%</div>
+      </div>
+    </article>
+  `;
+}
+
+function donutGradient(slices) {
+  const total = slices.reduce((sum, slice) => sum + Number(slice.value || 0), 0) || 1;
+  let current = 0;
+
+  return slices.map(slice => {
+    const start = current;
+    current += (Number(slice.value || 0) / total) * 100;
+    return `${slice.color} ${start}% ${current}%`;
+  }).join(', ');
+}
+
+function percentage(value, total) {
+  if (!total) {
+    return 0;
+  }
+
+  return Math.round((Number(value || 0) / Number(total)) * 100);
 }
 
 function adminTemplate() {
@@ -929,6 +999,17 @@ function paymentMethodLabel(method) {
     credit: 'Credito',
     debit: 'Debito'
   }[method] || 'Dinheiro';
+}
+
+function iconSvg(name) {
+  const icons = {
+    home: '<path d="M3 10.8 12 3l9 7.8"/><path d="M5 9.5V21h5v-6h4v6h5V9.5"/>',
+    queue: '<path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/>',
+    box: '<path d="m21 8-9-5-9 5 9 5 9-5Z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/>',
+    chart: '<path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 16v-5"/><path d="M12 16V8"/><path d="M16 16v-7"/>'
+  };
+
+  return `<svg viewBox="0 0 24 24" aria-hidden="true">${icons[name] || icons.home}</svg>`;
 }
 
 function escapeHtml(value) {
